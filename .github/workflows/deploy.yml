@@ -27,13 +27,6 @@ jobs:
       name: "Authenticate to Google Cloud"
       uses: "google-github-actions/auth@v1"
       with:
-        credentials_json: ${{ steps.env.outputs.GCP_CREDENTIALS }}
-
-    # Authentication via credentials json
-    - id: "auth"
-      name: "Authenticate to Google Cloud"
-      uses: "google-github-actions/auth@v1"
-      with:
         credentials_json: ${{ secrets.GKE_SA_KEY }}
 
     # Setup gcloud CLI
