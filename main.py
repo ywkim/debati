@@ -31,6 +31,30 @@ async def _test(ctx: SlashContext, emoji: str = None):
         emoji = random.choice(EMOJIS)
     await ctx.send(content=f"Hello world {emoji}", hidden=False)
 
+RPS_CHOICES = ["rock", "paper", "scissors"]
+@slash.slash(
+    name="challenge",
+    description="Challenge to a match of rock paper scissors",
+    options=[
+        create_option(
+            name="object",
+            description="Pick your object",
+            option_type=3,
+            required=True,
+            choices=[{"name": choice.capitalize(), "value": choice} for choice in RPS_CHOICES]
+        )
+    ]
+)
+async def _challenge(ctx: SlashContext, object: str):
+    bot_choice = random.choice(RPS_CHOICES)
+    if object == bot_choice:
+        result = "It's a draw!"
+    elif (object == "rock" and bot_choice == "scissors") or (object == "paper" and bot_choice == "rock") or (object == "scissors" and bot_choice == "paper"):
+        result = "You win!"
+    else:
+        result = "You lose!"
+    await ctx.send(content=f"You chose {object}, I chose {bot_choice}. {result}", hidden=False)
+
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
