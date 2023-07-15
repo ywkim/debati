@@ -1,69 +1,72 @@
+import openai
 import os
 import random
 import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.utils.manage_commands import create_option
+from discord import Activity, ActivityType
+import logging
 
 intents = discord.Intents.default()
 intents.members = True
+intents.message_content = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 slash = SlashCommand(bot, sync_commands=True)
 
-EMOJIS = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇"]
-
-@slash.slash(
-    name="test",
-    description="A test command",
-    options=[
-        create_option(
-            name="emoji",
-            description="Choose an emoji",
-            option_type=3,
-            required=False,
-            choices=[{"name": emoji, "value": emoji} for emoji in EMOJIS]
-        )
-    ]
-)
-async def _test(ctx: SlashContext, emoji: str = None):
-    if not emoji:
-        emoji = random.choice(EMOJIS)
-    await ctx.send(content=f"Hello world {emoji}", hidden=False)
-
-RPS_CHOICES = ["rock", "paper", "scissors"]
-@slash.slash(
-    name="challenge",
-    description="Challenge to a match of rock paper scissors",
-    options=[
-        create_option(
-            name="object",
-            description="Pick your object",
-            option_type=3,
-            required=True,
-            choices=[{"name": choice.capitalize(), "value": choice} for choice in RPS_CHOICES]
-        )
-    ]
-)
-async def _challenge(ctx: SlashContext, object: str):
-    bot_choice = random.choice(RPS_CHOICES)
-    if object == bot_choice:
-        result = "It's a draw!"
-    elif (object == "rock" and bot_choice == "scissors") or (object == "paper" and bot_choice == "rock") or (object == "scissors" and bot_choice == "paper"):
-        result = "You win!"
-    else:
-        result = "You lose!"
-    await ctx.send(content=f"You chose {object}, I chose {bot_choice}. {result}", hidden=False)
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} has connected to Discord!')
+    await bot.change_presence(activity=Activity(type=ActivityType.watching, name="Brains"))
+    logging.info(f'{bot.user} is online and ready to answer your questions!')
 
-bot.load_extension('commands.ask')
-bot.load_extension('commands.imagine')
-bot.load_extension('commands.optimize')
-bot.load_extension('commands.translate')
-bot.load_extension('events.on_message')
-bot.load_extension('events.on_member_join')
+openai.api_key = os.getenv('OPENAI_API_KEY')
+
+@slash.slash(
+    name="ask",
+    description="Answers your questions!",
+    options=[
+        create_option(
+            name="prompt",
+            description="What is your question?",
+            option_type=3,
+            required=True
+        ),
+        create_option(
+            name="model",
+            description="What model do you want to ask from? (Default: ChatGPT)",
+            option_type=3,
+            required=False,
+            choices=[
+                {"name": 'ChatGPT (BEST OF THE BEST)', "value": 'chatgpt'},
+                {"name": 'Davinci (Most powerful)', "value": 'davinci'},
+                {"name": 'Curie', "value": 'curie'},
+                {"name": 'Babbage', "value": 'babbage'},
+                {"name": 'Ada (Fastest)', "value": 'ada'}
+            ]
+        ),
+        create_option(
+            name='ephemeral',
+            description='Hides the bot\'s reply from others. (Default: Disable)',
+            option_type=3,
+            required=False,
+            choices=[
+                {"name": 'Enable', "value": 'Enable'},
+                {"name": 'Disable', "value": 'Disable'}
+            ]
+        )
+    ]
+)
+async def _ask(ctx: SlashContext, prompt: str, model: str = 'chatgpt', ephemeral: str = 'Disable'):
+    response = openai.ChatCompletion.create(
+      model="gpt-3.5-turbo",
+      messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": question}
+        ]
+    )
+
+    await ctx.send(response['choices'][0]['message']['content'])
 
 bot.run(os.getenv('TOKEN'))
