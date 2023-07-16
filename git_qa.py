@@ -1,0 +1,102 @@
+"""Tool for load files from a Git repository and QA."""
+import logging
+import os
+from typing import Any, List, Optional, Type
+
+from pydantic import BaseModel, Field
+from langchain.callbacks.manager import (
+    AsyncCallbackManagerForToolRun,
+    CallbackManagerForToolRun,
+)
+
+from langchain.requests import TextRequestsWrapper
+from langchain.tools.base import BaseTool
+from langchain.document_loaders import WebBaseLoader
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.tools.base import ToolException
+from langchain.document_loaders import GitLoader
+from git.exc import GitError
+from langchain.vectorstores import Pinecone
+from pinecone.core.exceptions import PineconeException
+from langchain.chains import RetrievalQA
+
+# Load from environment variables
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENV = os.getenv("PINECONE_ENV")
+
+import pinecone
+
+# initialize pinecone
+pinecone.init(
+    api_key=PINECONE_API_KEY,
+    environment=PINECONE_ENV,
+)
+
+class GitQASchema(BaseModel):
+    question: str = Field(description="should be a question on source code. Since the questions are answered by other LLMs, it is good to include specific tasks. And since this LLM has no history, you should include everything in your question. If the task is complex, it is better to split it up into several requests.")
+    sha: str = Field(description="should be a 40 byte hex version of 20 byte binary sha(hash)")
+
+class GitQA(BaseTool):
+    """Tool for load files from a Git repository and QA."""
+
+    name = "git_qa"
+    description = (
+        "Use this when you need to answer questions about specific Git repository. A hash of the repository's default branch must be provided."
+    )
+    args_schema: Type[GitQASchema] = GitQASchema
+    llm: Any = Field()
+    embeddings: Any = Field()
+    pinecone_index: str
+
+    def _run(
+        self,
+        question: str,
+        sha: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        """Use the tool."""
+        print("GitQA")
+        try:
+            index = pinecone.Index(self.pinecone_index)
+            namespaces = index.describe_index_stats()["namespaces"]
+            if sha not in namespaces:
+                raise ToolException(f"Invalid sha: {sha}")
+            vector_count = namespaces[sha]["vector_count"]
+            if vector_count == 0:
+                raise ToolException(f"Namespace {sha} is empty")
+            print(vector_count)
+
+            db = Pinecone.from_existing_index(self.pinecone_index, self.embeddings, namespace=sha)
+            retriever = db.as_retriever()
+
+            matched_docs = retriever.get_relevant_documents(question)
+            print(f"Matched docs: {len(matched_docs)}")
+            for i, d in enumerate(matched_docs):
+                print(f"\n[Document {i}]\n")
+                print(d.page_content)
+
+            qa = RetrievalQA.from_chain_type(llm=self.llm, retriever=retriever)
+            answer = qa.run(question)
+            return answer
+        except PineconeException as e:
+            print(e)
+            raise ToolException() from e
+
+    async def _arun(
+        self,
+        question: str,
+        url: str,
+        branch: str,
+        run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
+    ) -> str:
+        """Use the tool asynchronously."""
+        search_query = f"site:wikipedia.org {question}"  # Modify search query as needed
+        search_results = await self.requests_tool.arun(
+            url=f"https://www.google.com/search?q={search_query}"
+        )
+        # Process search_results and extract relevant information for answering the question
+        # Perform question answering using the extracted information
+        answer = "Sample answer"  # Replace with actual answer
+        return answer
+
+        return await self.requests_wrapper.aget(_clean_url(url))
