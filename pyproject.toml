@@ -8,8 +8,7 @@ packages = [{include = "discord_gpt_bot"}]
 
 [tool.poetry.dependencies]
 python = "^3.8.6"
-"discord.py" = "^1"
-discord-py-slash-command = "^3"
+discord-py-interactions = "^4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"

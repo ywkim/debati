@@ -1,42 +1,36 @@
 import openai
 import os
 import random
-import discord
-from discord.ext import commands
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_commands import create_option
-from discord import Activity, ActivityType
+import interactions
+from interactions import OptionType, Option, CommandContext
 import logging
 
-intents = discord.Intents.default()
-intents.members = True
-intents.message_content = True
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-bot = commands.Bot(command_prefix='!', intents=intents)
-slash = SlashCommand(bot, sync_commands=True)
+client = interactions.Client(token=os.getenv('TOKEN'), default_scope=os.getenv('GUILD_ID'))
 
-
-@bot.event
+@client.event
 async def on_ready():
-    await bot.change_presence(activity=Activity(type=ActivityType.watching, name="Brains"))
-    logging.info(f'{bot.user} is online and ready to answer your questions!')
+    logging.info(f'{client.me} is online and ready to answer your questions!')
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-@slash.slash(
+@client.command(
     name="ask",
     description="Answers your questions!",
     options=[
-        create_option(
+        Option(
             name="prompt",
             description="What is your question?",
-            option_type=3,
+            type=OptionType.STRING,
             required=True
         ),
-        create_option(
+        Option(
             name="model",
             description="What model do you want to ask from? (Default: ChatGPT)",
-            option_type=3,
+            type=OptionType.STRING,
             required=False,
             choices=[
                 {"name": 'ChatGPT (BEST OF THE BEST)', "value": 'chatgpt'},
@@ -46,10 +40,10 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
                 {"name": 'Ada (Fastest)', "value": 'ada'}
             ]
         ),
-        create_option(
+        Option(
             name='ephemeral',
             description='Hides the bot\'s reply from others. (Default: Disable)',
-            option_type=3,
+            type=OptionType.STRING,
             required=False,
             choices=[
                 {"name": 'Enable', "value": 'Enable'},
@@ -58,15 +52,15 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
         )
     ]
 )
-async def _ask(ctx: SlashContext, prompt: str, model: str = 'chatgpt', ephemeral: str = 'Disable'):
+async def _ask(ctx: CommandContext, prompt: str, model: str = 'chatgpt', ephemeral: str = 'Disable'):
     response = openai.ChatCompletion.create(
       model="gpt-3.5-turbo",
       messages=[
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": question}
+            {"role": "user", "content": prompt}
         ]
     )
 
-    await ctx.send(response['choices'][0]['message']['content'])
+    await ctx.send(response['choices'][0]['message']['content'], ephemeral=(ephemeral == 'Enable'))
 
-bot.run(os.getenv('TOKEN'))
+client.start()
