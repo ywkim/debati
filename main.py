@@ -142,8 +142,8 @@ def register_events_and_commands(client, config):
         response_message = await agent.arun(prompt)
         await ctx.send(response_message, ephemeral=(ephemeral == "Enable"))
 
-async def process_messages_from_file(file_path):
-    agent = init_agent_with_tools()
+async def process_messages_from_file(file_path, config):
+    agent = init_agent_with_tools(config)
     with open(file_path, "r", encoding="utf-8") as message_file:
         messages = json.load(message_file)
         for message in messages:
@@ -164,13 +164,13 @@ def main():
     config = load_config(args.config_file)
 
     if args.message_file:
-        asyncio.run(process_messages_from_file(args.message_file))
+        asyncio.run(process_messages_from_file(args.message_file, config))
     else:
         default_scope = None
         if config.get("settings", "guild_id") is not None:
             default_scope = int(config.get("settings", "guild_id"))
         client = interactions.Client(token=config.get("api", "discord_token"), default_scope=default_scope)
-        register_events_and_commands(client)
+        register_events_and_commands(client, config)
         client.start()
 
 
