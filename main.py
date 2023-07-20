@@ -35,10 +35,10 @@ logging.basicConfig(
 )
 
 
-def load_config():
+def load_config(config_file):
     config = configparser.ConfigParser()
     config.read_dict(DEFAULT_CONFIG)
-    config.read("config.ini")
+    config.read(config_file)
     return config
 
 
@@ -71,8 +71,7 @@ def load_tools(config):
     ]
 
 
-def init_agent_with_tools():
-    config = load_config()
+def init_agent_with_tools(config):
     system_prompt = SystemMessage(content=config.get("settings", "system_prompt"))
     agent_kwargs = {
         "extra_prompt_messages": [MessagesPlaceholder(variable_name="memory")],
@@ -95,61 +94,53 @@ def init_agent_with_tools():
     )
     return agent
 
+def register_events_and_commands(client, config):
+    @client.event
+    async def on_ready():
+        logging.info("%s is online and ready to answer your questions!", client.me)
 
-default_scope = None
-if os.getenv("GUILD_ID") is not None:
-    default_scope = int(os.getenv("GUILD_ID"))
-client = interactions.Client(token=os.getenv("TOKEN"), default_scope=default_scope)
-
-
-@client.event
-async def on_ready():
-    logging.info("%s is online and ready to answer your questions!", client.me)
-
-
-@client.command(
-    name="ask",
-    description="Answers your questions!",
-    options=[
-        Option(
-            name="prompt",
-            description="What is your question?",
-            type=OptionType.STRING,
-            required=True,
-        ),
-        Option(
-            name="model",
-            description="What model do you want to ask from? (Default: ChatGPT)",
-            type=OptionType.STRING,
-            required=False,
-            choices=[
-                {"name": "ChatGPT (BEST OF THE BEST)", "value": "chatgpt"},
-                {"name": "Davinci (Most powerful)", "value": "davinci"},
-                {"name": "Curie", "value": "curie"},
-                {"name": "Babbage", "value": "babbage"},
-                {"name": "Ada (Fastest)", "value": "ada"},
-            ],
-        ),
-        Option(
-            name="ephemeral",
-            description="Hides the bot's reply from others. (Default: Disable)",
-            type=OptionType.STRING,
-            required=False,
-            choices=[
-                {"name": "Enable", "value": "Enable"},
-                {"name": "Disable", "value": "Disable"},
-            ],
-        ),
-    ],
-)
-async def _ask(
-    ctx: CommandContext, prompt: str, model: str = "chatgpt", ephemeral: str = "Disable"
-):
-    await ctx.defer()
-    agent = init_agent_with_tools()
-    response_message = await agent.arun(prompt)
-    await ctx.send(response_message, ephemeral=(ephemeral == "Enable"))
-
+    @client.command(
+        name="ask",
+        description="Answers your questions!",
+        options=[
+            Option(
+                name="prompt",
+                description="What is your question?",
+                type=OptionType.STRING,
+                required=True,
+            ),
+            Option(
+                name="model",
+                description="What model do you want to ask from? (Default: ChatGPT)",
+                type=OptionType.STRING,
+                required=False,
+                choices=[
+                    {"name": "ChatGPT (BEST OF THE BEST)", "value": "chatgpt"},
+                    {"name": "Davinci (Most powerful)", "value": "davinci"},
+                    {"name": "Curie", "value": "curie"},
+                    {"name": "Babbage", "value": "babbage"},
+                    {"name": "Ada (Fastest)", "value": "ada"},
+                ],
+            ),
+            Option(
+                name="ephemeral",
+                description="Hides the bot's reply from others. (Default: Disable)",
+                type=OptionType.STRING,
+                required=False,
+                choices=[
+                    {"name": "Enable", "value": "Enable"},
+                    {"name": "Disable", "value": "Disable"},
+                ],
+            ),
+        ],
+    )
+    async def _ask(
+        ctx: CommandContext, prompt: str, model: str = "chatgpt", ephemeral: str = "Disable"
+    ):
+        await ctx.defer()
+        agent = init_agent_with_tools(config)
+        response_message = await agent.arun(prompt)
+        await ctx.send(response_message, ephemeral=(ephemeral == "Enable"))
 
 async def process_messages_from_file(file_path):
     agent = init_agent_with_tools()
@@ -163,13 +154,23 @@ async def process_messages_from_file(file_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config_file", default="config.ini", help="The path to a config file."
+    )
+    parser.add_argument(
         "--message_file", help="The path to a JSON file containing messages to process."
     )
     args = parser.parse_args()
 
+    config = load_config(args.config_file)
+
     if args.message_file:
         asyncio.run(process_messages_from_file(args.message_file))
     else:
+        default_scope = None
+        if config.get("settings", "guild_id") is not None:
+            default_scope = int(config.get("settings", "guild_id"))
+        client = interactions.Client(token=config.get("api", "discord_token"), default_scope=default_scope)
+        register_events_and_commands(client)
         client.start()
 
 
