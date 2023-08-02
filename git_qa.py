@@ -3,46 +3,37 @@ import logging
 import os
 from typing import Any, List, Optional, Type
 
-from pydantic import BaseModel, Field
+import pinecone
+from git.exc import GitError
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
-
-from langchain.requests import TextRequestsWrapper
-from langchain.tools.base import BaseTool
-from langchain.document_loaders import WebBaseLoader
-from langchain.indexes import VectorstoreIndexCreator
-from langchain.tools.base import ToolException
-from langchain.document_loaders import GitLoader
-from git.exc import GitError
-from langchain.vectorstores import Pinecone
-from pinecone.core.exceptions import PineconeException
 from langchain.chains import RetrievalQA
+from langchain.document_loaders import GitLoader, WebBaseLoader
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.requests import TextRequestsWrapper
+from langchain.tools.base import BaseTool, ToolException
+from langchain.vectorstores import Pinecone
+from openai.error import OpenAIError
+from pinecone.core.exceptions import PineconeException
+from pydantic import BaseModel, Field
 
-# Load from environment variables
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENV = os.getenv("PINECONE_ENV")
-
-import pinecone
-
-# initialize pinecone
-pinecone.init(
-    api_key=PINECONE_API_KEY,
-    environment=PINECONE_ENV,
-)
 
 class GitQASchema(BaseModel):
-    question: str = Field(description="should be a question on source code. Since the questions are answered by other LLMs, it is good to include specific tasks. And since this LLM has no history, you should include everything in your question. If the task is complex, it is better to split it up into several requests.")
-    sha: str = Field(description="should be a 40 byte hex version of 20 byte binary sha(hash)")
+    question: str = Field(
+        description="should be a question on source code. Since the questions are answered by other LLMs, it is good to include specific tasks. And since this LLM has no history, you should include everything in your question. If the task is complex, it is better to split it up into several requests."
+    )
+    sha: str = Field(
+        description="should be a 40 byte hex version of 20 byte binary sha(hash)"
+    )
+
 
 class GitQA(BaseTool):
     """Tool for load files from a Git repository and QA."""
 
     name = "git_qa"
-    description = (
-        "Use this when you need to answer questions about specific Git repository. A hash of the repository's default branch must be provided."
-    )
+    description = "Use this when you need to answer questions about specific Git repository. A hash of the repository's default branch must be provided."
     args_schema: Type[GitQASchema] = GitQASchema
     llm: Any = Field()
     embeddings: Any = Field()
@@ -66,7 +57,9 @@ class GitQA(BaseTool):
                 raise ToolException(f"Namespace {sha} is empty")
             print(vector_count)
 
-            db = Pinecone.from_existing_index(self.pinecone_index, self.embeddings, namespace=sha)
+            db = Pinecone.from_existing_index(
+                self.pinecone_index, self.embeddings, namespace=sha
+            )
             retriever = db.as_retriever()
 
             matched_docs = retriever.get_relevant_documents(question)
@@ -79,6 +72,9 @@ class GitQA(BaseTool):
             answer = qa.run(question)
             return answer
         except PineconeException as e:
+            print(e)
+            raise ToolException() from e
+        except OpenAIError as e:
             print(e)
             raise ToolException() from e
 

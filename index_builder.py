@@ -1,28 +1,15 @@
+import logging
 from abc import ABC, abstractmethod
-import configparser
-from langchain.embeddings.openai import OpenAIEmbeddings
+
 import pinecone
+from langchain.embeddings.openai import OpenAIEmbeddings
 from pinecone.core.client.exceptions import ApiException
-import logging
-
-from abc import ABC, abstractmethod
-
-import os
-import configparser
-from langchain.document_loaders import PyPDFLoader
-import logging
-import uuid
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from openai.error import APIError
-import pinecone
 from tqdm.auto import tqdm
-from pinecone.core.client.exceptions import ApiException
-import time
 
 _TEXT_FIELD = "text"
 
 logger = logging.getLogger(__name__)
+
 
 class IndexBuilder(ABC):
     def __init__(self, index_name, pinecone_api_key, pinecone_env, openai_api_key):
@@ -41,19 +28,20 @@ class IndexBuilder(ABC):
     def get_embeddings(self, openai_api_key):
         embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         dim = self.get_embeddings_dim(embeddings)
-        print("Dim:")
-        print(dim)
         return embeddings
 
     def initialize_pinecone(self):
         pinecone.init(api_key=self.pinecone_api_key, environment=self.pinecone_env)
         if self.index_name not in pinecone.list_indexes():
-            pinecone.create_index(name=self.index_name, metric='cosine', dimension=self.dim)
+            pinecone.create_index(
+                name=self.index_name, metric="cosine", dimension=self.dim
+            )
         else:
-            print(f"already exist: {self.index_name}")
+            print(f"Pinecone index already exist: {self.index_name}")
         return pinecone.Index(self.index_name)
 
     def upload_to_pinecone(self, db, index):
+        print(f"Uploading to Pineline namespace={self.namespace}")
         chroma_result_fields = ["metadatas", "documents", "embeddings"]
         num_embeds = db._collection.count()
         batch_size = 16

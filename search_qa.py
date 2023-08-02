@@ -8,7 +8,6 @@ from langchain.callbacks.manager import (
 )
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
-from langchain.llms import OpenAI
 from langchain.tools import BaseTool
 from langchain.tools.base import ToolException
 from openai.error import OpenAIError
@@ -28,7 +27,7 @@ class SearchQA(BaseTool):
     name = "search_qa"
     description = "Useful for when you need to answer questions about current events"
     args_schema: Type[SearchQASchema] = SearchQASchema
-    llm: OpenAI = Field()
+    llm: Any = Field()
     serp: Any = Field()
     embeddings: OpenAIEmbeddings = Field()
 

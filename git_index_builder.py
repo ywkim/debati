@@ -1,27 +1,32 @@
-import os
 import argparse
 import configparser
-from langchain.document_loaders import GitLoader
-import logging
-import uuid
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from openai.error import APIError
-import pinecone
-from tqdm.auto import tqdm
-from pinecone.core.client.exceptions import ApiException
-import time
-from git import Repo
-from openai.error import APIError, RateLimitError
 import glob
+import logging
+import os
 import time
+import uuid
 
-logger = logging.getLogger(__name__)
+from git import Repo
+from langchain.document_loaders import GitLoader
+from langchain.vectorstores import Chroma
+from openai.error import APIError, RateLimitError
+from tqdm.auto import tqdm
 
 from index_builder import IndexBuilder
 
+logger = logging.getLogger(__name__)
+
+
 class GitIndexBuilder(IndexBuilder):
-    def __init__(self, index_name, pinecone_api_key, pinecone_env, openai_api_key, repo_name, branch):
+    def __init__(
+        self,
+        index_name,
+        pinecone_api_key,
+        pinecone_env,
+        openai_api_key,
+        repo_name,
+        branch,
+    ):
         super().__init__(index_name, pinecone_api_key, pinecone_env, openai_api_key)
         self.repo_path = f"/Users/ywkim/repos/{repo_name}"
         self.repo_name = repo_name
@@ -34,7 +39,9 @@ class GitIndexBuilder(IndexBuilder):
             clone_url = f"https://github.com/{self.repo_name}"
         else:
             clone_url = None
-        self.loader = GitLoader(repo_path=self.repo_path, clone_url=clone_url, branch=self.branch)
+        self.loader = GitLoader(
+            repo_path=self.repo_path, clone_url=clone_url, branch=self.branch
+        )
         self.dump_documents()
 
     def dump_documents(self):
@@ -67,7 +74,9 @@ class GitIndexBuilder(IndexBuilder):
             db = Chroma(name, self.embeddings, persist_directory=self.db_path)
             db.persist()
         else:
-            db = Chroma(persist_directory=self.db_path, embedding_function=self.embeddings)
+            db = Chroma(
+                persist_directory=self.db_path, embedding_function=self.embeddings
+            )
 
         self.add_texts_to_db(db)
 
@@ -117,34 +126,43 @@ class GitIndexBuilder(IndexBuilder):
                 i_end = min(i + batch_size, len(texts))
 
                 db.add_texts(
-                            texts=texts[i:i_end],
-                            metadatas=metadatas[i:i_end],
-                            ids=ids[i:i_end]
-                        )
+                    texts=texts[i:i_end], metadatas=metadatas[i:i_end], ids=ids[i:i_end]
+                )
 
-                time.sleep(5) # Rate Limit
+                time.sleep(5)  # Rate Limit
             except (APIError, ValueError) as e:
                 logger.error(e)
                 with open(f"{self.doc_path}/.ignore", "a") as ignore_file:
                     for doc_id in ids[i:i_end]:
                         ignore_file.write(f"{doc_id}\n")
-                time.sleep(10) # Rate Limit
+                time.sleep(10)  # Rate Limit
             except RateLimitError as e:
                 logger.error(e)
                 break
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Git Index Builder')
-    parser.add_argument('repo_name', type=str, help='Name of the repository')
-    parser.add_argument('--branch', type=str, default='main', help='Branch of the repository')
+    parser = argparse.ArgumentParser(description="Git Index Builder")
+    parser.add_argument("repo_name", type=str, help="Name of the repository")
+    parser.add_argument(
+        "--branch", type=str, default="main", help="Branch of the repository"
+    )
 
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read("config.ini")
 
-    indexer = GitIndexBuilder(config.get('settings', 'pinecone_index'), config.get('api', 'pinecone_api_key'), config.get('api', 'pinecone_env'), config.get('api', 'openai_api_key'), args.repo_name, args.branch)
+    indexer = GitIndexBuilder(
+        config.get("settings", "pinecone_index"),
+        config.get("api", "pinecone_api_key"),
+        config.get("api", "pinecone_env"),
+        config.get("api", "openai_api_key"),
+        args.repo_name,
+        args.branch,
+    )
     indexer.run()
+
 
 if __name__ == "__main__":
     main()

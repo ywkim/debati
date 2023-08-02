@@ -43,7 +43,11 @@ def load_config(config_file):
 
 
 def load_tools(config):
-    llm = OpenAI(temperature=0, openai_api_key=config.get("api", "openai_api_key"))
+    llm = ChatOpenAI(
+        model=config.get("settings", "tool_chat_model"),
+        temperature=0,
+        openai_api_key=config.get("api", "openai_api_key"),
+    )
     serp = SerpAPIWrapper(serpapi_api_key=config.get("api", "serpapi_api_key"))
     embeddings = OpenAIEmbeddings(
         openai_api_key=config.get("api", "openai_api_key"), disallowed_special=()
@@ -94,6 +98,7 @@ def init_agent_with_tools(config):
     )
     return agent
 
+
 def register_events_and_commands(client, config):
     @client.event
     async def on_ready():
@@ -135,12 +140,16 @@ def register_events_and_commands(client, config):
         ],
     )
     async def _ask(
-        ctx: CommandContext, prompt: str, model: str = "chatgpt", ephemeral: str = "Disable"
+        ctx: CommandContext,
+        prompt: str,
+        model: str = "chatgpt",
+        ephemeral: str = "Disable",
     ):
         await ctx.defer()
         agent = init_agent_with_tools(config)
         response_message = await agent.arun(prompt)
         await ctx.send(response_message, ephemeral=(ephemeral == "Enable"))
+
 
 async def process_messages_from_file(file_path, config):
     agent = init_agent_with_tools(config)
@@ -169,7 +178,9 @@ def main():
         default_scope = None
         if config.get("settings", "guild_id") is not None:
             default_scope = int(config.get("settings", "guild_id"))
-        client = interactions.Client(token=config.get("api", "discord_token"), default_scope=default_scope)
+        client = interactions.Client(
+            token=config.get("api", "discord_token"), default_scope=default_scope
+        )
         register_events_and_commands(client, config)
         client.start()
 
