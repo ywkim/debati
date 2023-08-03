@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 def sync_process_frame(frame) -> str:
+    scripts = frame.locator("script")
+    scripts.evaluate_all("scripts => scripts.forEach(script => script.remove())")
+
     frame_text = frame.inner_text("body")
     title = frame.title()
 
@@ -33,6 +36,9 @@ def sync_process_frame(frame) -> str:
 
 
 async def async_process_frame(frame) -> str:
+    scripts = frame.locator("script")
+    await scripts.evaluate_all("scripts => scripts.forEach(script => script.remove())")
+
     frame_text = await frame.inner_text("body")
     title = await frame.title()
 
