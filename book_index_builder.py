@@ -9,6 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
 
 from index_builder import IndexBuilder
+from main import DEFAULT_CONFIG
 from utils import get_max_tokens
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,8 @@ class BookIndexBuilder(IndexBuilder):
         loader = PyPDFLoader(self.filename)
 
         max_token = get_max_tokens(self.llm.model_name)
-        chunk_size = int(max_token * 0.9)
-        chunk_overlap = int(chunk_size * 0.2)
+        chunk_size = int(max_token * 0.2)
+        chunk_overlap = int(chunk_size * 0.05)
         length_function = self.llm.get_num_tokens
 
         splitter = RecursiveCharacterTextSplitter(
@@ -61,10 +62,11 @@ def main():
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
+    config.read_dict(DEFAULT_CONFIG)
     config.read("config.ini")
 
     llm = OpenAI(
-        model=config.get("settings", "tool_llm_model"),
+        model=config.get("settings", "chat_model"),
         temperature=0,
         openai_api_key=config.get("api", "openai_api_key"),
     )

@@ -13,6 +13,7 @@ from openai.error import APIError, RateLimitError
 from tqdm.auto import tqdm
 
 from index_builder import IndexBuilder
+from main import DEFAULT_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ def main():
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
+    config.read_dict(DEFAULT_CONFIG)
     config.read("config.ini")
 
     indexer = GitIndexBuilder(

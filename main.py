@@ -44,7 +44,7 @@ def load_config(config_file):
 
 def load_tools(config):
     llm = ChatOpenAI(
-        model=config.get("settings", "tool_chat_model"),
+        model=config.get("settings", "chat_model"),
         temperature=0,
         openai_api_key=config.get("api", "openai_api_key"),
     )
