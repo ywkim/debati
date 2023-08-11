@@ -1,5 +1,6 @@
 import argparse
 import configparser
+import hashlib
 import logging
 import uuid
 
@@ -22,7 +23,12 @@ class BookIndexBuilder(IndexBuilder):
         super().__init__(index_name, pinecone_api_key, pinecone_env, openai_api_key)
         self.llm = llm
         self.filename = filename
-        self._namespace = str(uuid.uuid4())
+
+        with open(self.filename, "rb") as f:
+            data = f.read()
+
+        hashed_data = hashlib.sha1(data).hexdigest()
+        self._namespace = hashed_data
 
     def load_documents(self):
         print("Loading PDF...")
