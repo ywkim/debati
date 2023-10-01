@@ -17,7 +17,7 @@ from langchain.tools.base import BaseTool, ToolException
 from openai.error import OpenAIError
 from pydantic import BaseModel, Field
 
-from utils import get_max_tokens
+from qa.utils import get_max_tokens
 
 logger = logging.getLogger(__name__)
 

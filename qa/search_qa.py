@@ -13,7 +13,7 @@ from langchain.tools.base import ToolException
 from openai.error import OpenAIError
 from pydantic import BaseModel, Field
 
-from serp_loader import SerpAPILoader
+from qa.serp_loader import SerpAPILoader
 
 
 class SearchQASchema(BaseModel):
