@@ -4,13 +4,8 @@ import configparser
 import json
 import logging
 
-from slack_sdk.web.async_client import AsyncWebClient
-from slack_sdk.socket_mode.aiohttp import SocketModeClient
-from slack_sdk.socket_mode.request import SocketModeRequest
-from slack_sdk.socket_mode.response import SocketModeResponse
-
 import pinecone
-from langchain.agents import AgentType, initialize_agent, AgentExecutor
+from langchain.agents import AgentExecutor, AgentType, initialize_agent
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.llms import OpenAI
@@ -18,6 +13,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain.prompts import MessagesPlaceholder
 from langchain.schema import SystemMessage
 from langchain.utilities import SerpAPIWrapper
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp
 
 from qa.book_qa import BookQA
 from qa.git_qa import GitQA
@@ -101,31 +98,29 @@ def init_agent_with_tools(config: configparser.ConfigParser) -> AgentExecutor:
     return agent
 
 
-def register_events_and_commands(socket_mode_client, config):
-    @socket_mode_client.socket_mode_request_listeners.append
-    async def handle_message(client: SocketModeClient, request: SocketModeRequest):
-        if request.type != 'message':
-            logging.info('Ignoring non-message event')
-            return
+def register_events_and_commands(
+    app: AsyncApp, config: configparser.ConfigParser
+) -> None:
+    @app.command("/ask")
+    async def handle_command(ack, body, say):
+        # Acknowledge the command request right away
+        await ack()
+        # Provide an immediate response to indicate the question is being processed
+        await say("Processing your question, please wait...")
 
-        message_payload = request.payload["event"]
-        channel_id = message_payload["channel"]
+        question = body.get("text", "")
+        logging.info("Received a question: %s", question)
+        response = await ask_question_to_agent(question, config)
+        logging.info("Generated response: %s", response)
+        # include the question in the reply
+        await say(f"Question: {question}\nAnswer: {response}")
 
-        if "bot_id" in message_payload:
-            logging.info('Ignoring bot message')
-            return
-
-        text = message_payload.get("text", "")
-        logging.info('Received a message: %s', text)
-        response_message = await ask_question_to_agent(text, config)
-        logging.info('Generated response: %s', response_message)
-        await client.web_client.chat_postMessage(channel=channel_id, text=response_message)
-        await client.send_socket_mode_response(SocketModeResponse(envelope_id=request.envelope_id))
 
 async def ask_question_to_agent(message: str, config):
     """Pass the message to the agent and get an answer."""
     agent = init_agent_with_tools(config)  # Create agent
     return await agent.arun(message)  # Get agent to process the message
+
 
 async def process_messages_from_file(file_path, config):
     agent = init_agent_with_tools(config)
@@ -137,7 +132,7 @@ async def process_messages_from_file(file_path, config):
 
 
 async def main():
-    logging.info('Starting bot')
+    logging.info("Starting bot")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -159,22 +154,16 @@ async def main():
         slack_bot_token = config.get("api", "slack_bot_token")
         slack_app_token = config.get("api", "slack_app_token")
 
-        logging.info('Initializing Slack client')
-        web_client = AsyncWebClient(token=slack_bot_token)
+        logging.info("Initializing AsyncApp and SocketModeHandler")
+        app = AsyncApp(token=slack_bot_token)
+        handler = AsyncSocketModeHandler(app, slack_app_token)
 
-        logging.info('Initializing Socket Mode client')
-        socket_mode_client = SocketModeClient(app_token=slack_app_token, web_client=web_client)
+        logging.info("Registering event and command handlers")
+        register_events_and_commands(app, config)
 
-        logging.info('Registering event and command handlers')
-        register_events_and_commands(socket_mode_client, config)
+        logging.info("Starting SocketModeHandler")
+        await handler.start_async()
 
-        logging.info('Starting Socket Mode client')
-        await socket_mode_client.connect()
-
-        logging.info('Bot is running')
-
-        # Just not to stop this process
-        await asyncio.sleep(float("inf"))
 
 if __name__ == "__main__":
     asyncio.run(main())
