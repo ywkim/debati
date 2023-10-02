@@ -115,11 +115,15 @@ def register_events_and_commands(
         # include the question in the reply
         await say(f"Question: {question}\nAnswer: {response}")
 
+    @app.event("message")
+    async def handle_message_events(body, logger):
+        logger.info(body)
+
 
 async def ask_question_to_agent(message: str, config):
     """Pass the message to the agent and get an answer."""
-    agent = init_agent_with_tools(config)  # Create agent
-    return await agent.arun(message)  # Get agent to process the message
+    agent = init_agent_with_tools(config)
+    return await agent.arun(message)
 
 
 async def process_messages_from_file(file_path, config):
