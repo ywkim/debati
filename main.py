@@ -163,11 +163,28 @@ def register_events_and_commands(
     async def handle_message_events(body, logger):
         logger.info(body)
 
+    @app.event("app_mention")
+    async def handle_mention_events(body, say, logger):
+        event = body["event"]
+        thread_ts = event.get("thread_ts", None) or event["ts"]
+        user = event["user"]
+        message_text = (
+            event["text"]
+            .replace(f"<@{body['authorizations'][0]['user_id']}>", "")
+            .strip()
+        )
+
+        logger.info(f"Received a question from {user}: {message_text}")
+
+        answer = await ask_question_to_agent(message_text, config)
+        await say(text=answer, thread_ts=thread_ts)
+
 
 async def ask_question_to_agent(message: str, config):
     """Pass the message to the agent and get an answer."""
     agent = init_agent_with_tools(config)
-    return await agent.arun(message)
+    response_message = await agent.arun(message)
+    return response_message
 
 
 async def process_messages_from_file(file_path, config):
