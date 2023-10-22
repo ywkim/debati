@@ -27,7 +27,7 @@ jobs:
 
     - name: Lint with Pylint
       run: |
-        poetry run pylint --recursive=y main.py test_config.py
+        poetry run pylint --recursive=y main.py tests
 
     - name: Check Code Style with isort and black
       run: |
@@ -40,4 +40,4 @@ jobs:
 
     - name: Run Unit Tests
       run: |
-        poetry run python -m unittest test_config.py
+        poetry run python -m unittest discover -s tests
