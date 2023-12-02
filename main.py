@@ -5,84 +5,146 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import re
 from typing import Any
 
 import aiohttp
 import emoji_data_python
 from aiohttp import ClientError
-from langchain.chat_models import ChatOpenAI
+from google.cloud import firestore
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 from slack_bolt.context.say.async_say import AsyncSay
 from slack_sdk.web.async_client import AsyncWebClient
 
-from config.app_config import AppConfig
-from utils.message_utils import InvalidRoleError, load_prefix_messages_from_file
+from config.app_config import AppConfig, init_chat_model
+from utils.logging_utils import create_log_message
+from utils.message_utils import prepare_chat_messages
 
 ERROR_EMOJI = "bangbang"
 EXCLUDED_EMOJIS = ["eyes", ERROR_EMOJI]
 
 EMOJI_SYSTEM_PROMPT = "사용자의 슬랙 메시지에 대한 반응을 슬랙 Emoji로 표시하세요. 표현하기 어렵다면 :?:를 사용해 주세요."
 
-MAX_TOKENS = 1023
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 
-def custom_serializer(obj: Any) -> str:
-    """Custom serialization function for logging.
-
-    Args:
-        obj (Any): Object to be serialized.
-
-    Returns:
-        str: Serialized string representation of the object.
-
-    Raises:
-        TypeError: If the object type cannot be serialized.
+class SlackAppConfig(AppConfig):
     """
-    if isinstance(obj, BaseMessage):
-        content = obj.content
-        # Check if content is a list and contains base64 image data
-        if isinstance(content, list):
-            serialized_content: list[str | dict[Any, Any]] = []
-            for item in content:
-                if isinstance(item, dict) and item["type"] == "image_url":
-                    # Shorten the base64 image data for logging
-                    img_data = item["image_url"]["url"]
-                    shortened_img_data = (
-                        (img_data[:30] + "...") if len(img_data) > 30 else img_data
-                    )
-                    serialized_content.append(
-                        {"type": "image_url", "image_url": {"url": shortened_img_data}}
-                    )
-                else:
-                    serialized_content.append(item)
-            return f"{obj.__class__.__name__}({serialized_content})"
-        return f"{obj.__class__.__name__}({content})"
-    if hasattr(obj, "__str__"):
-        return str(obj)
-    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+    Manages the application configuration settings.
 
+    This class is responsible for loading configuration settings from various sources
+    including environment variables, files, and Firebase Firestore.
 
-def create_log_message(message: str, **kwargs: Any) -> str:
-    """로그 메시지 생성 및 JSON 형식으로 변환.
-
-    Args:
-        message (str): 로그 메시지.
-        **kwargs (Any): 추가 로그 매개변수.
-
-    Returns:
-        str: JSON 형식으로 변환된 로그 메시지.
+    Attributes:
+        config (ConfigParser): A ConfigParser object holding the configuration.
     """
-    log_entry = {"message": message, **kwargs}
-    return json.dumps(
-        log_entry, default=custom_serializer, ensure_ascii=False, indent=4
-    )
+
+    def load_config_from_file(self, config_file: str) -> None:
+        """Load configuration from a given file path."""
+        self.config.read(config_file)
+        logging.info("Configuration loaded from file %s", config_file)
+
+    def load_config_from_env_vars(self) -> None:
+        """Load configuration from environment variables."""
+        env_config: dict[str, dict[str, Any]] = {
+            "api": {
+                "openai_api_key": os.environ.get("OPENAI_API_KEY"),
+                "slack_bot_token": os.environ.get("SLACK_BOT_TOKEN"),
+                "slack_app_token": os.environ.get("SLACK_APP_TOKEN"),
+            },
+            "settings": {
+                "chat_model": os.environ.get(
+                    "CHAT_MODEL", self.DEFAULT_CONFIG["settings"]["chat_model"]
+                ),
+                "system_prompt": os.environ.get(
+                    "SYSTEM_PROMPT", self.DEFAULT_CONFIG["settings"]["system_prompt"]
+                ),
+                "temperature": os.environ.get(
+                    "TEMPERATURE", self.DEFAULT_CONFIG["settings"]["temperature"]
+                ),
+                "vision_enabled": os.environ.get(
+                    "VISION_ENABLED", self.DEFAULT_CONFIG["settings"]["vision_enabled"]
+                ).lower()
+                in {"true", "1", "yes"},
+            },
+            "firebase": {
+                "enabled": os.environ.get(
+                    "FIREBASE_ENABLED", self.DEFAULT_CONFIG["firebase"]["enabled"]
+                ).lower()
+                in {"true", "1", "yes"}
+            },
+        }
+
+        openai_org = os.environ.get("OPENAI_ORGANIZATION", None)
+        if openai_org is not None:
+            env_config["api"]["openai_organization"] = openai_org
+
+        self.config.read_dict(env_config)
+        logging.info("Configuration loaded from environment variables")
+
+    def _validate_config(self) -> None:
+        """Validate that required configuration variables are present."""
+        super()._validate_config()
+
+        required_settings = ["slack_bot_token", "slack_app_token"]
+        for setting in required_settings:
+            assert setting in self.config["api"], f"Missing configuration for {setting}"
+
+        self.bot_token = self.config.get("api", "slack_bot_token")
+        self.app_token = self.config.get("api", "slack_app_token")
+
+    async def load_config_from_firebase(self, bot_user_id: str) -> None:
+        """
+        Load configuration from Firebase Firestore. Uses default values from self.DEFAULT_CONFIG
+        if certain configuration values are missing, except for 'prefix_messages_content',
+        which defaults to None.
+
+        Args:
+            bot_user_id (str): The unique identifier for the bot.
+
+        Raises:
+            FileNotFoundError: If the bot or companion document does not exist in Firebase.
+        """
+        db = firestore.AsyncClient()
+        bot_ref = db.collection("Bots").document(bot_user_id)
+        bot = await bot_ref.get()
+        if not bot.exists:
+            raise FileNotFoundError(
+                f"Bot with ID {bot_user_id} does not exist in Firebase."
+            )
+        companion_id = bot.get("CompanionId")
+        companion_ref = db.collection("Companions").document(companion_id)
+        companion = await companion_ref.get()
+        if not companion.exists:
+            raise FileNotFoundError(
+                f"Companion with ID {companion_id} does not exist in Firebase."
+            )
+
+        self._apply_settings_from_companion(companion)
+
+        logging.info(
+            "Configuration loaded from Firebase Firestore for bot %s", bot_user_id
+        )
+
+    def load_config(self, config_file: (str | None) = None) -> None:
+        """Load configuration from a given file and fall back to environment variables if the file does not exist."""
+        if config_file:
+            if os.path.exists(config_file):
+                self.load_config_from_file(config_file)
+            else:
+                raise FileNotFoundError(f"Config file {config_file} does not exist.")
+        elif os.path.exists("config.ini"):
+            self.load_config_from_file("config.ini")
+        else:
+            # If no config file provided, load config from environment variables
+            self.load_config_from_env_vars()
+
+        self._validate_config()
 
 
 def extract_image_url(message: dict[str, Any]) -> str | None:
@@ -142,20 +204,7 @@ def encode_image_to_base64(image_data: bytes) -> str | None:
     return None
 
 
-def init_chat_model(app_config: AppConfig) -> ChatOpenAI:
-    """Initialize the langchain chat model."""
-    config = app_config.config
-    chat = ChatOpenAI(
-        model=config.get("settings", "chat_model"),
-        temperature=float(config.get("settings", "temperature")),
-        openai_api_key=config.get("api", "openai_api_key"),
-        openai_organization=config.get("api", "openai_organization", fallback=None),
-        max_tokens=MAX_TOKENS,
-    )  # type: ignore
-    return chat
-
-
-def register_events_and_commands(app: AsyncApp, app_config: AppConfig) -> None:
+def register_events_and_commands(app: AsyncApp, app_config: SlackAppConfig) -> None:
     """
     Registers event handlers with the Slack application.
 
@@ -337,7 +386,7 @@ def is_valid_emoji_code(input_code: str) -> bool:
 
 
 async def format_messages(
-    thread_messages: list[dict[str, Any]], bot_user_id: str, app_config: AppConfig
+    thread_messages: list[dict[str, Any]], bot_user_id: str, app_config: SlackAppConfig
 ) -> list[BaseMessage]:
     """
     Formats messages from a Slack thread into a list of HumanMessage objects,
@@ -388,40 +437,6 @@ async def format_messages(
     return formatted_messages
 
 
-def format_prefix_messages_content(prefix_messages_json: str) -> list[BaseMessage]:
-    """
-    Format prefix messages content from json string to BaseMessage objects
-
-    Args:
-        prefix_messages_json (str): JSON string with prefix messages content
-
-    Returns:
-        list[BaseMessage]: list of BaseMessage instances
-
-    Raises:
-        InvalidRoleError: If the role in the content isn't 'assistant', 'user', or 'system'.
-    """
-    prefix_messages = json.loads(prefix_messages_json)
-    formatted_messages: list[BaseMessage] = []
-
-    for msg in prefix_messages:
-        role = msg["role"]
-        content = msg["content"]
-
-        if role.lower() == "user":
-            formatted_messages.append(HumanMessage(content=content))
-        elif role.lower() == "system":
-            formatted_messages.append(SystemMessage(content=content))
-        elif role.lower() == "assistant":
-            formatted_messages.append(AIMessage(content=content))
-        else:
-            raise InvalidRoleError(
-                f"Invalid role {role} in prefix content message. Role must be 'assistant', 'user', or 'system'."
-            )
-
-    return formatted_messages
-
-
 async def ask_question(
     formatted_messages: list[BaseMessage], app_config: AppConfig
 ) -> str:
@@ -435,30 +450,9 @@ async def ask_question(
     Returns:
         str: Content of the response from the Chat API.
     """
-    config = app_config.config
-    system_prompt = SystemMessage(content=config.get("settings", "system_prompt"))
-
-    # Check if 'message_file' setting presents. If it does, load prefix messages from file.
-    # If not, check if 'prefix_messages_content' is not None, then parse it to create the list of prefix messages
-    message_file_path = config.get("settings", "message_file", fallback=None)
-    prefix_messages_content = config.get(
-        "settings", "prefix_messages_content", fallback=None
-    )
-
-    prefix_messages: list[BaseMessage] = []
-
-    if message_file_path:
-        logging.info("Loading prefix messages from file %s", message_file_path)
-        prefix_messages = load_prefix_messages_from_file(message_file_path)
-    elif prefix_messages_content:
-        logging.info("Parsing prefix messages from settings")
-        prefix_messages = format_prefix_messages_content(prefix_messages_content)
-
-    # Appending prefix messages before the main conversation
-    formatted_messages = prefix_messages + formatted_messages
-
     chat = init_chat_model(app_config)
-    resp = await chat.agenerate([[system_prompt, *formatted_messages]])
+    prepared_messages = prepare_chat_messages(formatted_messages, app_config)
+    resp = await chat.agenerate([prepared_messages])
     return resp.generations[0][0].text
 
 
@@ -472,7 +466,7 @@ async def main():
     )
     args = parser.parse_args()
 
-    app_config = AppConfig()
+    app_config = SlackAppConfig()
     app_config.load_config(args.config_file)
 
     logging.info("Initializing AsyncApp and SocketModeHandler")
