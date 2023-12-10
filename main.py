@@ -6,12 +6,15 @@ import base64
 import json
 import logging
 import os
+import random
 import re
+from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
 import emoji_data_python
 from aiohttp import ClientError
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from google.cloud import firestore
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
@@ -19,7 +22,12 @@ from slack_bolt.async_app import AsyncApp
 from slack_bolt.context.say.async_say import AsyncSay
 from slack_sdk.web.async_client import AsyncWebClient
 
-from config.app_config import AppConfig, init_chat_model
+from config.app_config import (
+    AppConfig,
+    init_chat_model,
+    init_proactive_chat_model,
+    safely_get_field,
+)
 from utils.logging_utils import create_log_message
 from utils.message_utils import prepare_chat_messages
 
@@ -65,16 +73,17 @@ class SlackAppConfig(AppConfig):
                     "SYSTEM_PROMPT", self.DEFAULT_CONFIG["settings"]["system_prompt"]
                 ),
                 "temperature": os.environ.get(
-                    "TEMPERATURE", self.DEFAULT_CONFIG["settings"]["temperature"]
+                    "TEMPERATURE", str(self.DEFAULT_CONFIG["settings"]["temperature"])
                 ),
                 "vision_enabled": os.environ.get(
-                    "VISION_ENABLED", self.DEFAULT_CONFIG["settings"]["vision_enabled"]
+                    "VISION_ENABLED",
+                    str(self.DEFAULT_CONFIG["settings"]["vision_enabled"]),
                 ).lower()
                 in {"true", "1", "yes"},
             },
             "firebase": {
                 "enabled": os.environ.get(
-                    "FIREBASE_ENABLED", self.DEFAULT_CONFIG["firebase"]["enabled"]
+                    "FIREBASE_ENABLED", str(self.DEFAULT_CONFIG["firebase"]["enabled"])
                 ).lower()
                 in {"true", "1", "yes"}
             },
@@ -98,6 +107,40 @@ class SlackAppConfig(AppConfig):
         self.bot_token = self.config.get("api", "slack_bot_token")
         self.app_token = self.config.get("api", "slack_app_token")
 
+    def _apply_proactive_messaging_settings_from_bot(
+        self, bot_document: firestore.DocumentSnapshot
+    ) -> None:
+        """
+        Applies proactive messaging settings from the provided bot document snapshot.
+
+        This method extracts the proactive messaging settings from the Firestore
+        document snapshot of the bot and applies them to the current configuration.
+        It ensures that the proactive messaging feature and its related settings
+        (interval days, system prompt, and Slack channel) are configured according
+        to the bot's settings in Firestore.
+
+        Args:
+            bot_document (firestore.DocumentSnapshot): A snapshot of the Firestore
+                                                      document for the bot.
+        """
+        if safely_get_field(
+            bot_document,
+            "proactive_messaging.enabled",
+            self.DEFAULT_CONFIG["proactive_messaging"]["enabled"],
+        ):
+            proactive_messaging_settings: dict[str, Any] = {
+                "enabled": True,
+                "interval_days": bot_document.get("proactive_messaging.interval_days"),
+                "system_prompt": bot_document.get("proactive_messaging.system_prompt"),
+                "slack_channel": bot_document.get("proactive_messaging.slack_channel"),
+                "temperature": safely_get_field(
+                    bot_document,
+                    "proactive_messaging.temperature",
+                    self.DEFAULT_CONFIG["proactive_messaging"]["temperature"],
+                ),
+            }
+            self.config.read_dict({"proactive_messaging": proactive_messaging_settings})
+
     async def load_config_from_firebase(self, bot_user_id: str) -> None:
         """
         Load configuration from Firebase Firestore. Uses default values from self.DEFAULT_CONFIG
@@ -117,6 +160,9 @@ class SlackAppConfig(AppConfig):
             raise FileNotFoundError(
                 f"Bot with ID {bot_user_id} does not exist in Firebase."
             )
+
+        self._apply_proactive_messaging_settings_from_bot(bot)
+
         companion_id = bot.get("CompanionId")
         companion_ref = db.collection("Companions").document(companion_id)
         companion = await companion_ref.get()
@@ -145,6 +191,81 @@ class SlackAppConfig(AppConfig):
             self.load_config_from_env_vars()
 
         self._validate_config()
+
+
+class ProactiveMessagingContext:
+    """
+    Represents the context for proactive messaging.
+
+    Attributes:
+        app (AsyncApp): The Slack app instance.
+        app_config (SlackAppConfig): The application configuration.
+        scheduler (AsyncIOScheduler): The scheduler instance.
+        bot_user_id (str): The user ID of the bot.
+    """
+
+    def __init__(
+        self,
+        app: AsyncApp,
+        app_config: SlackAppConfig,
+        scheduler: AsyncIOScheduler,
+        bot_user_id: str,
+    ):
+        self.app = app
+        self.app_config = app_config
+        self.scheduler = scheduler
+        self.bot_user_id = bot_user_id
+
+
+async def schedule_next_proactive_message(context: ProactiveMessagingContext):
+    """
+    Schedules the next proactive message.
+
+    This function calculates the next time to send a proactive message based on the
+    interval setting and schedules the message accordingly.
+    """
+    interval = context.app_config.proactive_message_interval_days
+    next_schedule_time = datetime.now() + timedelta(days=interval * random.random() * 2)
+
+    context.scheduler.add_job(
+        send_proactive_message, "date", run_date=next_schedule_time, args=[context]
+    )
+
+    logging.info("Next proactive message scheduled for: %s", next_schedule_time)
+
+
+async def send_proactive_message(context: ProactiveMessagingContext):
+    """
+    Sends a proactive message to the specified Slack channel.
+
+    This function generates a proactive message using the chat model based on the
+    system prompt configured in the app settings. It then sends the generated message
+    to the specified Slack channel and schedules the next proactive message.
+    """
+    if context.app_config.firebase_enabled:
+        await context.app_config.load_config_from_firebase(context.bot_user_id)
+        logging.info("Configuration updated from Firebase Firestore.")
+
+    # Initialize chat model and generate message
+    chat = init_proactive_chat_model(context.app_config)
+    system_prompt = SystemMessage(content=context.app_config.proactive_system_prompt)
+    resp = await chat.agenerate([[system_prompt]])
+    message = resp.generations[0][0].text
+
+    # Send the generated message to the specified Slack channel
+    channel = context.app_config.proactive_slack_channel
+    await context.app.client.chat_postMessage(channel=channel, text=message)
+
+    logging.info(
+        create_log_message(
+            "Proactive message sent to channel",
+            channel=channel,
+            text=message,
+        )
+    )
+
+    # Schedule the next proactive message
+    await schedule_next_proactive_message(context)
 
 
 def extract_image_url(message: dict[str, Any]) -> str | None:
@@ -256,10 +377,7 @@ def register_events_and_commands(app: AsyncApp, app_config: SlackAppConfig) -> N
 
         try:
             # If Firebase is enabled, override the config with the one from Firebase
-            firebase_enabled = app_config.config.getboolean(
-                "firebase", "enabled", fallback=False
-            )
-            if firebase_enabled:
+            if app_config.firebase_enabled:
                 await app_config.load_config_from_firebase(bot_user_id)
                 logging.info("Override configuration with Firebase settings")
 
@@ -476,15 +594,19 @@ async def main():
     bot_user_id = bot_auth_info["user_id"]
     logging.info("Bot User ID is %s", bot_user_id)
 
-    firebase_enabled = app_config.config.getboolean(
-        "firebase", "enabled", fallback=False
-    )
-    if firebase_enabled:
+    if app_config.firebase_enabled:
         await app_config.load_config_from_firebase(bot_user_id)
         logging.info("Override configuration with Firebase settings")
 
     logging.info("Registering event and command handlers")
     register_events_and_commands(app, app_config)
+
+    if app_config.proactive_messaging_enabled:
+        scheduler = AsyncIOScheduler()
+        context = ProactiveMessagingContext(app, app_config, scheduler, bot_user_id)
+        await schedule_next_proactive_message(context)
+        scheduler.start()
+        logging.info("Proactive messaging has been scheduled.")
 
     logging.info("Starting SocketModeHandler")
     await handler.start_async()
