@@ -155,7 +155,7 @@ def display_stance_selection() -> UserStance:
     cols = st.columns(2)
     if cols[0].button("찬성", use_container_width=True):
         return UserStance.PRO
-    elif cols[1].button("반대", use_container_width=True):
+    if cols[1].button("반대", use_container_width=True):
         return UserStance.CON
     return UserStance.UNDECIDED
 
@@ -177,12 +177,13 @@ def ask_question(
 ) -> Generator[str, None, None]:
     """
     Initialize a chat model and stream the chat conversation. This includes optional prefix messages loaded
-    from a file or settings, followed by the main conversation messages. The function yields each chunk of
-    the response content as it is received from the Chat API.
+    from a file or settings, followed by the main conversation messages. The function adjusts its responses based
+    on the user's stance in the debate and yields each chunk of the response content as it is received from the Chat API.
 
     Args:
         formatted_messages (list[BaseMessage]): List of formatted messages constituting the main conversation.
         app_config (AppConfig): Configuration parameters for the application.
+        user_stance (UserStance): The user's stance in the debate, influencing the direction of the conversation.
 
     Yields:
         Generator[str, None, None]: Generator yielding each content chunk from the Chat API responses.
