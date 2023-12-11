@@ -55,7 +55,8 @@ class AppConfig(ABC):
         "settings": {
             "chat_model": "gpt-4",
             "questioning_system_prompt": "You are a helpful assistant answering student questions.",
-            "debating_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
+            "pro_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
+            "con_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
             "temperature": 0,
             "vision_enabled": False,
         },
@@ -82,12 +83,21 @@ class AppConfig(ABC):
         )
 
     @property
-    def debating_system_prompt(self) -> str:
-        """Returns the system prompt for debating AI."""
+    def pro_system_prompt(self) -> str:
+        """Returns the system prompt for pro stance in debating AI."""
         return self.config.get(
             "settings",
-            "debating_system_prompt",
-            fallback=self.DEFAULT_CONFIG["settings"]["debating_system_prompt"],
+            "pro_system_prompt",
+            fallback=self.DEFAULT_CONFIG["settings"]["pro_system_prompt"],
+        )
+
+    @property
+    def con_system_prompt(self) -> str:
+        """Returns the system prompt for con stance in debating AI."""
+        return self.config.get(
+            "settings",
+            "con_system_prompt",
+            fallback=self.DEFAULT_CONFIG["settings"]["con_system_prompt"],
         )
 
     @property

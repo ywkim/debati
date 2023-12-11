@@ -81,7 +81,7 @@ def format_prefix_messages_content(prefix_messages_json: str) -> list[BaseMessag
 
 
 def prepare_chat_messages(
-    formatted_messages: list[BaseMessage], app_config: AppConfig, is_debating: bool
+    formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: str | None
 ) -> list[BaseMessage]:
     """
     Prepares chat messages by appending appropriate prefix messages to the conversation
@@ -95,8 +95,13 @@ def prepare_chat_messages(
     Returns:
         list[BaseMessage]: The prepared list of messages including prefix messages.
     """
-    system_prompt_content = (app_config.debating_system_prompt if is_debating
-                             else app_config.questioning_system_prompt)
+    if user_stance == "찬성":
+        system_prompt_content = app_config.pro_system_prompt
+    elif user_stance == "반대":
+        system_prompt_content = app_config.con_system_prompt
+    elif user_stance is None:
+        system_prompt_content = app_config.questioning_system_prompt
+
     system_prompt = SystemMessage(content=system_prompt_content)
 
     # Appending prefix messages before the main conversation

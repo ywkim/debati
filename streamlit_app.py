@@ -43,7 +43,10 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     Args:
         app_config (StreamlitAppConfig): The configuration object for the app.
     """
-    is_debating = "user_stance" in st.session_state  # 사용자가 찬반 입장을 이미 선택했는지 확인
+    if "user_stance" in st.session_state:
+        user_stance = st.session_state.user_stance
+    else:
+        user_stance = None
 
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
@@ -96,7 +99,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 response_message = ""
 
             # Generate response using chat model
-            for message_chunk in ask_question(formatted_messages, app_config, is_debating):
+            for message_chunk in ask_question(formatted_messages, app_config, user_stance):
                 logging.info(
                     create_log_message(
                         "Received response from OpenAI API",
@@ -157,7 +160,7 @@ def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
 
 
 def ask_question(
-        formatted_messages: list[BaseMessage], app_config: AppConfig, is_debating: bool
+        formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: str | None
 ) -> Generator[str, None, None]:
     """
     Initialize a chat model and stream the chat conversation. This includes optional prefix messages loaded
@@ -172,7 +175,7 @@ def ask_question(
         Generator[str, None, None]: Generator yielding each content chunk from the Chat API responses.
     """
     chat = init_chat_model(app_config)
-    prepared_messages = prepare_chat_messages(formatted_messages, app_config, is_debating)
+    prepared_messages = prepare_chat_messages(formatted_messages, app_config, user_stance)
     for chunk in chat.stream(prepared_messages):
         yield str(chunk.content)
 
