@@ -133,10 +133,15 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
         if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
+            if user_stance == UserStance.PRO:
+                initial_message = "당신이 로봇세 도입에 찬성함에 따라, 저는 반대 입장에서 토론을 진행할 것입니다."
+            else:
+                initial_message = "당신이 로봇세 도입에 반대함에 따라, 저는 찬성 입장에서 토론을 진행할 것입니다."
+
             # If user stance is selected, reset thread_messages for debating phase
             # Reset thread messages for debating phase
             st.session_state.thread_messages = [
-                {"role": "assistant", "content": "토론 단계에 오신 것을 환영합니다! 여기서는 로봇세 도입에 대한 찬반 입장을 논의합니다."}
+                {"role": "assistant", "content": initial_message}
             ]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
