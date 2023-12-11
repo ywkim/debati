@@ -126,7 +126,8 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.error(error_message)
 
     # Check if the user has already chosen a stance
-    if "user_stance" not in st.session_state:
+    message_count = len(st.session_state.thread_messages)
+    if "user_stance" not in st.session_state and message_count > 1:
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
             # Display stance selection interface
             user_stance = display_stance_selection()
