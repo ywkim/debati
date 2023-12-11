@@ -99,20 +99,5 @@ def prepare_chat_messages(
                              else app_config.questioning_system_prompt)
     system_prompt = SystemMessage(content=system_prompt_content)
 
-    # Check if 'message_file' setting presents. If it does, load prefix messages from file.
-    # If not, check if 'prefix_messages_content' is not None, then parse it to create the list of prefix messages
-
-    message_file_path = config.get("settings", "message_file", fallback=None)
-    prefix_messages_content = config.get(
-        "settings", "prefix_messages_content", fallback=None
-    )
-
-    prefix_messages: list[BaseMessage] = []
-
-    if message_file_path:
-        prefix_messages = load_prefix_messages_from_file(message_file_path)
-    elif prefix_messages_content:
-        prefix_messages = format_prefix_messages_content(prefix_messages_content)
-
     # Appending prefix messages before the main conversation
-    return [system_prompt, *prefix_messages, *formatted_messages]
+    return [system_prompt, *formatted_messages]

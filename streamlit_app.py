@@ -83,7 +83,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 logging.info("Override configuration with Firebase settings")
 
             # Format messages for chat model processing with appropriate system prompt
-            formatted_messages = format_messages(st.session_state.thread_messages, is_debating)
+            formatted_messages = format_messages(st.session_state.thread_messages)
             logging.info(
                 create_log_message(
                     "Sending messages to OpenAI API",
@@ -96,7 +96,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 response_message = ""
 
             # Generate response using chat model
-            for message_chunk in ask_question(formatted_messages, app_config):
+            for message_chunk in ask_question(formatted_messages, app_config, is_debating):
                 logging.info(
                     create_log_message(
                         "Received response from OpenAI API",
@@ -136,7 +136,7 @@ def display_stance_selection() -> str | None:
     Displays the interface for the user to select their stance on the topic.
     """
     st.write("로봇세 도입에 대한 당신의 입장은 무엇인가요?")
-    cols = st.beta_columns(2)
+    cols = st.columns(2)
     if cols[0].button("찬성"):
         return "찬성"
     elif cols[1].button("반대"):
@@ -157,7 +157,7 @@ def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
 
 
 def ask_question(
-    formatted_messages: list[BaseMessage], app_config: AppConfig
+        formatted_messages: list[BaseMessage], app_config: AppConfig, is_debating: bool
 ) -> Generator[str, None, None]:
     """
     Initialize a chat model and stream the chat conversation. This includes optional prefix messages loaded
@@ -172,7 +172,7 @@ def ask_question(
         Generator[str, None, None]: Generator yielding each content chunk from the Chat API responses.
     """
     chat = init_chat_model(app_config)
-    prepared_messages = prepare_chat_messages(formatted_messages, app_config)
+    prepared_messages = prepare_chat_messages(formatted_messages, app_config, is_debating)
     for chunk in chat.stream(prepared_messages):
         yield str(chunk.content)
 
