@@ -12,6 +12,11 @@ from config.streamlit_config import StreamlitAppConfig
 from utils.logging_utils import create_log_message
 from utils.message_utils import prepare_chat_messages, UserStance
 
+ASSISTANT_AVATAR_URL = "https://avatars.slack-edge.com/2023-11-19/6217189323093_136df1241dc3492d67d6_192.png"
+AVATARS = {
+"assistant": ASSISTANT_AVATAR_URL
+}
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -28,7 +33,8 @@ def display_messages(messages: list[dict[str, Any]]) -> None:
         messages (list[dict[str, Any]]): A list of message dictionaries, where each message has a 'role' and 'content'.
     """
     for message in messages:
-        with st.chat_message(message["role"]):
+        role = message["role"]
+        with st.chat_message(role, avatar=AVATARS.get(role)):
             st.markdown(message["content"])
 
 
@@ -94,7 +100,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 )
             )
 
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
                 message_placeholder = st.empty()
                 response_message = ""
 
@@ -121,8 +127,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
     # Check if the user has already chosen a stance
     if "user_stance" not in st.session_state:
-        # Display stance selection interface
-        user_stance = display_stance_selection()
+        with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
+            # Display stance selection interface
+            user_stance = display_stance_selection()
         if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
@@ -140,9 +147,9 @@ def display_stance_selection() -> UserStance:
     """
     st.write("로봇세 도입에 대한 당신의 입장은 무엇인가요?")
     cols = st.columns(2)
-    if cols[0].button("찬성"):
+    if cols[0].button("찬성", use_container_width=True):
         return UserStance.PRO
-    elif cols[1].button("반대"):
+    elif cols[1].button("반대", use_container_width=True):
         return UserStance.CON
     return UserStance.UNDECIDED
 
