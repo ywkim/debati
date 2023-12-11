@@ -57,7 +57,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     if "companion_id" in st.session_state:
         companion_name = st.session_state.companion_id
     else:
-        companion_name = "Buppy"
+        companion_name = "토론이"
 
     st.title(companion_name)
 
