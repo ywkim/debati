@@ -54,7 +54,8 @@ class AppConfig(ABC):
     DEFAULT_CONFIG: dict[str, dict[str, Any]] = {
         "settings": {
             "chat_model": "gpt-4",
-            "system_prompt": "You are a helpful assistant.",
+            "questioning_system_prompt": "You are a helpful assistant answering student questions.",
+            "debating_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
             "temperature": 0,
             "vision_enabled": False,
         },
@@ -70,6 +71,24 @@ class AppConfig(ABC):
         """Initialize AppConfig with default settings."""
         self.config: ConfigParser = ConfigParser()
         self.config.read_dict(self.DEFAULT_CONFIG)
+
+    @property
+    def questioning_system_prompt(self) -> str:
+        """Returns the system prompt for questioning AI."""
+        return self.config.get(
+            "settings",
+            "questioning_system_prompt",
+            fallback=self.DEFAULT_CONFIG["settings"]["questioning_system_prompt"],
+        )
+
+    @property
+    def debating_system_prompt(self) -> str:
+        """Returns the system prompt for debating AI."""
+        return self.config.get(
+            "settings",
+            "debating_system_prompt",
+            fallback=self.DEFAULT_CONFIG["settings"]["debating_system_prompt"],
+        )
 
     @property
     def vision_enabled(self) -> bool:

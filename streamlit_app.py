@@ -43,6 +43,8 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     Args:
         app_config (StreamlitAppConfig): The configuration object for the app.
     """
+    is_debating = "user_stance" in st.session_state  # 사용자가 찬반 입장을 이미 선택했는지 확인
+
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
         st.session_state.thread_messages = []
@@ -78,8 +80,8 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 app_config.load_config_from_firebase(companion_id)
                 logging.info("Override configuration with Firebase settings")
 
-            # Format messages for chat model processing
-            formatted_messages = format_messages(st.session_state.thread_messages)
+            # Format messages for chat model processing with appropriate system prompt
+            formatted_messages = format_messages(st.session_state.thread_messages, is_debating)
             logging.info(
                 create_log_message(
                     "Sending messages to OpenAI API",

@@ -81,20 +81,23 @@ def format_prefix_messages_content(prefix_messages_json: str) -> list[BaseMessag
 
 
 def prepare_chat_messages(
-    formatted_messages: list[BaseMessage], app_config: AppConfig
+    formatted_messages: list[BaseMessage], app_config: AppConfig, is_debating: bool
 ) -> list[BaseMessage]:
     """
-    Prepares chat messages by appending prefix messages to the conversation.
+    Prepares chat messages by appending appropriate prefix messages to the conversation
+    based on whether it's a questioning or debating scenario.
 
     Args:
         formatted_messages (list[BaseMessage]): The list of conversation messages.
         app_config (AppConfig): The application configuration.
+        is_debating (bool): Flag to indicate if the current session is for debating.
 
     Returns:
         list[BaseMessage]: The prepared list of messages including prefix messages.
     """
-    config = app_config.config
-    system_prompt = SystemMessage(content=config.get("settings", "system_prompt"))
+    system_prompt_content = (app_config.debating_system_prompt if is_debating
+                             else app_config.questioning_system_prompt)
+    system_prompt = SystemMessage(content=system_prompt_content)
 
     # Check if 'message_file' setting presents. If it does, load prefix messages from file.
     # If not, check if 'prefix_messages_content' is not None, then parse it to create the list of prefix messages
