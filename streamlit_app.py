@@ -123,7 +123,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     if "user_stance" not in st.session_state:
         # Display stance selection interface
         user_stance = display_stance_selection()
-        if user_stance:
+        if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
             # If user stance is selected, reset thread_messages for debating phase
