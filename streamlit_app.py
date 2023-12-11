@@ -10,7 +10,7 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage
 from config.app_config import AppConfig, init_chat_model
 from config.streamlit_config import StreamlitAppConfig
 from utils.logging_utils import create_log_message
-from utils.message_utils import prepare_chat_messages
+from utils.message_utils import prepare_chat_messages, UserStance
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -46,7 +46,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     if "user_stance" in st.session_state:
         user_stance = st.session_state.user_stance
     else:
-        user_stance = None
+        user_stance = UserStance.UNDECIDED
 
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
@@ -134,17 +134,17 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             # Display reset messages
             display_messages(st.session_state.thread_messages)
 
-def display_stance_selection() -> str | None:
+def display_stance_selection() -> UserStance:
     """
     Displays the interface for the user to select their stance on the topic.
     """
     st.write("로봇세 도입에 대한 당신의 입장은 무엇인가요?")
     cols = st.columns(2)
     if cols[0].button("찬성"):
-        return "찬성"
+        return UserStance.PRO
     elif cols[1].button("반대"):
-        return "반대"
-    return None
+        return UserStance.CON
+    return UserStance.UNDECIDED
 
 def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
     """Formats messages for the chatbot's processing."""
@@ -160,7 +160,7 @@ def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
 
 
 def ask_question(
-        formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: str | None
+        formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: UserStance
 ) -> Generator[str, None, None]:
     """
     Initialize a chat model and stream the chat conversation. This includes optional prefix messages loaded

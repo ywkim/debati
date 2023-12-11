@@ -7,6 +7,12 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from config.app_config import AppConfig
 
+from enum import Enum, auto
+
+class UserStance(Enum):
+    PRO = auto()
+    CON = auto()
+    UNDECIDED = auto()
 
 class InvalidRoleError(Exception):
     """Exception raised when an invalid role is encountered in message processing."""
@@ -81,7 +87,7 @@ def format_prefix_messages_content(prefix_messages_json: str) -> list[BaseMessag
 
 
 def prepare_chat_messages(
-    formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: str | None
+    formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: UserStance
 ) -> list[BaseMessage]:
     """
     Prepares chat messages by appending appropriate prefix messages to the conversation
@@ -95,11 +101,11 @@ def prepare_chat_messages(
     Returns:
         list[BaseMessage]: The prepared list of messages including prefix messages.
     """
-    if user_stance == "찬성":
+    if user_stance == UserStance.PRO:
         system_prompt_content = app_config.pro_system_prompt
-    elif user_stance == "반대":
+    elif user_stance == UserStance.CON:
         system_prompt_content = app_config.con_system_prompt
-    elif user_stance is None:
+    elif user_stance == UserStance.UNDECIDED:
         system_prompt_content = app_config.questioning_system_prompt
 
     system_prompt = SystemMessage(content=system_prompt_content)
