@@ -47,7 +47,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
-        st.session_state.thread_messages = []
+        st.session_state.thread_messages = [
+            {"role": "assistant", "content": "로봇세에 대해 궁금한 점을 자유롭게 물어보세요."}
+        ]
 
     if "companion_id" in st.session_state:
         companion_name = st.session_state.companion_id
@@ -114,6 +116,32 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             )
             st.error(error_message)
 
+    # Check if the user has already chosen a stance
+    if "user_stance" not in st.session_state:
+        # Display stance selection interface
+        user_stance = display_stance_selection()
+        if user_stance:
+            st.session_state.user_stance = user_stance
+
+            # If user stance is selected, reset thread_messages for debating phase
+            # Reset thread messages for debating phase
+            st.session_state.thread_messages = [
+                {"role": "assistant", "content": "토론 단계에 오신 것을 환영합니다! 여기서는 로봇세 도입에 대한 찬반 입장을 논의합니다."}
+            ]
+            # Display reset messages
+            display_messages(st.session_state.thread_messages)
+
+def display_stance_selection() -> str | None:
+    """
+    Displays the interface for the user to select their stance on the topic.
+    """
+    st.write("로봇세 도입에 대한 당신의 입장은 무엇인가요?")
+    cols = st.beta_columns(2)
+    if cols[0].button("찬성"):
+        return "찬성"
+    elif cols[1].button("반대"):
+        return "반대"
+    return None
 
 def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
     """Formats messages for the chatbot's processing."""
