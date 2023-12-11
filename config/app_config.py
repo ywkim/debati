@@ -74,6 +74,14 @@ class AppConfig(ABC):
         self.config.read_dict(self.DEFAULT_CONFIG)
 
     @property
+    def debate_topic(self) -> str:
+        """Returns the current debate topic."""
+        return self.config.get(
+            "settings",
+            "debate_topic"
+        )
+
+    @property
     def questioning_system_prompt(self) -> str:
         """Returns the system prompt for questioning AI."""
         return self.config.get(

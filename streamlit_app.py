@@ -49,6 +49,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     Args:
         app_config (StreamlitAppConfig): The configuration object for the app.
     """
+    # Retrieve the current debate topic from the configuration
+    debate_topic = app_config.debate_topic
+
     if "user_stance" in st.session_state:
         user_stance = st.session_state.user_stance
     else:
@@ -57,13 +60,13 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
         st.session_state.thread_messages = [
-            {"role": "assistant", "content": "로봇세에 대해 궁금한 점을 자유롭게 물어보세요."}
+            {"role": "assistant", "content": f"{debate_topic}에 대해 궁금한 점을 자유롭게 물어보세요."}
         ]
 
     if "companion_id" in st.session_state:
         companion_name = st.session_state.companion_id
     else:
-        companion_name = "토론이"
+        companion_name = f"토론 주제: {debate_topic}"
 
     st.title(companion_name)
 
@@ -130,28 +133,26 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     if "user_stance" not in st.session_state and message_count > 1:
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
             # Display stance selection interface
-            user_stance = display_stance_selection()
+            user_stance = display_stance_selection(debate_topic)
         if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
             if user_stance == UserStance.PRO:
-                initial_message = "당신이 로봇세 도입에 찬성함에 따라, 저는 반대 입장에서 토론을 진행할 것입니다."
+                initial_message = f"당신이 {debate_topic}에 찬성함에 따라, 저는 반대 입장에서 토론을 진행합니다."
             else:
-                initial_message = "당신이 로봇세 도입에 반대함에 따라, 저는 찬성 입장에서 토론을 진행할 것입니다."
+                initial_message = f"당신이 {debate_topic}에 반대함에 따라, 저는 찬성 입장에서 토론을 진행합니다."
 
             # If user stance is selected, reset thread_messages for debating phase
             # Reset thread messages for debating phase
-            st.session_state.thread_messages = [
-                {"role": "assistant", "content": initial_message}
-            ]
+            st.session_state.thread_messages = [{"role": "assistant", "content": initial_message}]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
 
-def display_stance_selection() -> UserStance:
+def display_stance_selection(debate_topic: str) -> UserStance:
     """
     Displays the interface for the user to select their stance on the topic.
     """
-    st.write("로봇세 도입에 대한 당신의 입장은 무엇인가요?")
+    st.write(f"{debate_topic}에 대한 당신의 입장은 무엇인가요?")
     cols = st.columns(2)
     if cols[0].button("찬성", use_container_width=True):
         return UserStance.PRO
