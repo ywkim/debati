@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 import logging
 from collections.abc import Generator
 from typing import Any
 
 import streamlit as st
-from langchain.schema import AIMessage, BaseMessage, HumanMessage
+from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from config.app_config import AppConfig, init_chat_model
 from config.streamlit_config import StreamlitAppConfig
@@ -52,6 +53,10 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     else:
         companion_name = f"토론 주제: {debate_topic}"
 
+    # Initialize or update the progress bar
+    if "debate_score" not in st.session_state:
+        st.session_state.debate_score = 0
+
     st.title(companion_name)
 
     # Display existing chat messages
@@ -77,6 +82,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 companion_id = st.session_state.companion_id
                 app_config.load_config_from_firebase(companion_id)
                 logging.info("Override configuration with Firebase settings")
+
+            # Evaluate debate performance after each message
+            st.session_state.debate_score = evaluate_debate_performance(app_config, st.session_state.thread_messages)
 
             # Format messages for chat model processing with appropriate system prompt
             formatted_messages = format_messages(st.session_state.thread_messages)
@@ -113,11 +121,11 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.error(error_message)
 
     # Check if the user has already chosen a stance
-    message_count = len(st.session_state.thread_messages)
-    if "user_stance" not in st.session_state and message_count > 1:
+    if "user_stance" not in st.session_state and len(st.session_state.thread_messages) > 1:
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
             # Display stance selection interface
             user_stance = display_stance_selection(debate_topic)
+
         if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
@@ -131,6 +139,11 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.session_state.thread_messages = [{"role": "assistant", "content": initial_message}]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
+
+
+    if "user_stance" in st.session_state and len(st.session_state.thread_messages) > 2:
+        # Update progress bar and feedback
+        progress_bar = st.progress(st.session_state.debate_score / 10)
 
 def display_messages(messages: list[dict[str, Any]]) -> None:
     """
@@ -192,6 +205,36 @@ def ask_question(
     prepared_messages = prepare_chat_messages(formatted_messages, app_config, user_stance)
     for chunk in chat.stream(prepared_messages):
         yield str(chunk.content)
+
+def evaluate_debate_performance(app_config: StreamlitAppConfig, thread_messages: list[dict[str, Any]]) -> float:
+    """
+    Evaluates the student's performance in the debate using AI and returns the score and feedback.
+
+    Args:
+        app_config (StreamlitAppConfig): The application configuration.
+        thread_messages (list[dict[str, Any]]): The list of messages in the debate thread.
+
+    Returns:
+        tuple[float, str]: A tuple containing the debate score and feedback.
+    """
+    messages_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in thread_messages])
+    evaluation_prompt = app_config.debate_evaluation_prompt
+
+    chat = init_chat_model(app_config)
+    formatted_messages = [SystemMessage(content=evaluation_prompt), HumanMessage(content=messages_str)]
+    resp = chat.generate([formatted_messages])
+    response = resp.generations[0][0].text
+
+    # Extract score and feedback from AI response
+    score_match = re.search(r"\b\d+(\.\d+)?\b", response)
+    debate_score = float(score_match.group()) if score_match else 0.0
+
+    if debate_score > 10:
+        debate_score = 10.0
+
+    logging.info(create_log_message("Evaluation Response", response=response, debate_score=debate_score))
+
+    return debate_score
 
 
 def display_companion_id_input() -> str | None:

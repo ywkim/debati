@@ -57,6 +57,7 @@ class AppConfig(ABC):
             "questioning_system_prompt": "You are a helpful assistant answering student questions.",
             "pro_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
             "con_system_prompt": "You are a debate assistant opposing the student's viewpoint.",
+            "debate_evaluation_prompt": "Evaluate the following student's debate performance based on the coherence, relevance, and logical consistency of their arguments. Provide a score out of 10.",
             "temperature": 0,
             "vision_enabled": False,
         },
@@ -106,6 +107,15 @@ class AppConfig(ABC):
             "settings",
             "con_system_prompt",
             fallback=self.DEFAULT_CONFIG["settings"]["con_system_prompt"],
+        )
+
+    @property
+    def debate_evaluation_prompt(self) -> str:
+        """Returns the system prompt for debate evaluation."""
+        return self.config.get(
+            "settings",
+            "debate_evaluation_prompt",
+            fallback=self.DEFAULT_CONFIG["settings"]["debate_evaluation_prompt"],
         )
 
     @property
