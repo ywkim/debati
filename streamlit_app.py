@@ -22,22 +22,6 @@ logging.basicConfig(
 )
 
 
-def display_messages(messages: list[dict[str, Any]]) -> None:
-    """
-    Displays chat messages in the Streamlit interface.
-
-    This function iterates over a list of messages and displays them in the Streamlit chat interface.
-    Each message is displayed with the appropriate role (user or assistant).
-
-    Args:
-        messages (list[dict[str, Any]]): A list of message dictionaries, where each message has a 'role' and 'content'.
-    """
-    for message in messages:
-        role = message["role"]
-        with st.chat_message(role, avatar=AVATARS.get(role)):
-            st.markdown(message["content"])
-
-
 def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     """
     Manages the chat interaction, including displaying the chat interface and handling user inputs and responses.
@@ -147,6 +131,21 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.session_state.thread_messages = [{"role": "assistant", "content": initial_message}]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
+
+def display_messages(messages: list[dict[str, Any]]) -> None:
+    """
+    Displays chat messages in the Streamlit interface.
+
+    This function iterates over a list of messages and displays them in the Streamlit chat interface.
+    Each message is displayed with the appropriate role (user or assistant).
+
+    Args:
+        messages (list[dict[str, Any]]): A list of message dictionaries, where each message has a 'role' and 'content'.
+    """
+    for message in messages:
+        role = message["role"]
+        with st.chat_message(role, avatar=AVATARS.get(role)):
+            st.markdown(message["content"])
 
 def display_stance_selection(debate_topic: str) -> UserStance:
     """
