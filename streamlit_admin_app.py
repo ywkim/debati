@@ -155,10 +155,6 @@ def main():
         companion_id_to_upload = selected_companion_id
         existing_data = admin_app.get_companion_data(selected_companion_id)
 
-    existing_prefix_messages_str = format_prefix_messages_for_display(
-        existing_data.get("prefix_messages_content", [])
-    )
-
     # Adjust the chat_models list based on existing data
     existing_model = existing_data.get("chat_model", "gpt-4")
     if existing_model not in chat_models:
@@ -167,9 +163,26 @@ def main():
 
     chat_model = st.selectbox("Chat Model", chat_models, index=chat_model_index)
 
-    system_prompt = st.text_area(
-        "System Prompt", value=existing_data.get("system_prompt", "")
+    # 새로운 토론 관련 설정 추가
+    debate_topic = st.text_input(
+        "Debate Topic", value=existing_data.get("debate_topic", "")
     )
+    debate_evaluation_prompt = st.text_area(
+        "Debate Evaluation Prompt",
+        value=existing_data.get("debate_evaluation_prompt", ""),
+    )
+    questioning_system_prompt = st.text_area(
+        "Questioning System Prompt",
+        value=existing_data.get("questioning_system_prompt", ""),
+    )
+    pro_system_prompt = st.text_area(
+        "Pro System Prompt", value=existing_data.get("pro_system_prompt", "")
+    )
+    con_system_prompt = st.text_area(
+        "Con System Prompt", value=existing_data.get("con_system_prompt", "")
+    )
+
+    # Temperature 및 Prefix Messages 설정
     temperature = st.number_input(
         "Temperature",
         min_value=0.0,
@@ -178,27 +191,17 @@ def main():
         value=existing_data.get("temperature", 1.0),
     )
 
-    # Text area for editing or adding prefix messages
-    prefix_messages_str = st.text_area(
-        "Edit Prefix Messages (CSV format: Role,Content)",
-        value=existing_prefix_messages_str,
-    )
-
-    # Process the edited prefix messages from the text area
-    edited_prefix_messages = (
-        load_prefix_messages_from_csv(prefix_messages_str)
-        if prefix_messages_str
-        else []
-    )
-
     # Companion data upload logic
     if companion_id_to_upload and st.button("Upload Companion Data"):
         companion_data = {
             "chat_model": chat_model,
-            "system_prompt": system_prompt,
             "temperature": temperature,
             "vision_enabled": False,
-            "prefix_messages_content": edited_prefix_messages,
+            "debate_topic": debate_topic,
+            "debate_evaluation_prompt": debate_evaluation_prompt,
+            "questioning_system_prompt": questioning_system_prompt,
+            "pro_system_prompt": pro_system_prompt,
+            "con_system_prompt": con_system_prompt,
         }
         admin_app.upload_companion_data(companion_id_to_upload, companion_data)
         st.success(f"Companion '{companion_id_to_upload}' data updated successfully.")

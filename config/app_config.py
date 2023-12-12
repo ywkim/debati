@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from abc import ABC, abstractmethod
 from configparser import ConfigParser
@@ -209,13 +208,6 @@ class AppConfig(ABC):
                     self.DEFAULT_CONFIG["settings"]["chat_model"],
                 )
             ),
-            "system_prompt": (
-                safely_get_field(
-                    companion,
-                    "system_prompt",
-                    self.DEFAULT_CONFIG["settings"]["system_prompt"],
-                )
-            ),
             "temperature": (
                 safely_get_field(
                     companion,
@@ -230,12 +222,36 @@ class AppConfig(ABC):
                     self.DEFAULT_CONFIG["settings"]["vision_enabled"],
                 )
             ),
+            "debate_topic": (companion.get("debate_topic")),
+            "debate_evaluation_prompt": (
+                safely_get_field(
+                    companion,
+                    "debate_evaluation_prompt",
+                    self.DEFAULT_CONFIG["settings"]["debate_evaluation_prompt"],
+                )
+            ),
+            "questioning_system_prompt": (
+                safely_get_field(
+                    companion,
+                    "questioning_system_prompt",
+                    self.DEFAULT_CONFIG["settings"]["questioning_system_prompt"],
+                )
+            ),
+            "pro_system_prompt": (
+                safely_get_field(
+                    companion,
+                    "pro_system_prompt",
+                    self.DEFAULT_CONFIG["settings"]["pro_system_prompt"],
+                )
+            ),
+            "con_system_prompt": (
+                safely_get_field(
+                    companion,
+                    "con_system_prompt",
+                    self.DEFAULT_CONFIG["settings"]["con_system_prompt"],
+                )
+            ),
         }
-
-        # Add 'prefix_messages_content' only if it exists
-        prefix_messages_content = safely_get_field(companion, "prefix_messages_content")
-        if prefix_messages_content is not None:
-            settings["prefix_messages_content"] = json.dumps(prefix_messages_content)
 
         # Apply the new configuration settings
         self.config.read_dict({"settings": settings})
@@ -267,7 +283,6 @@ class AppConfig(ABC):
         """
         readable_config = (
             f"Chat Model: {self.config.get('settings', 'chat_model')}\n"
-            f"System Prompt: {self.config.get('settings', 'system_prompt')}\n"
             f"Temperature: {self.config.get('settings', 'temperature')}\n"
             f"Vision Enabled: {'Yes' if self.vision_enabled else 'No'}"
         )
