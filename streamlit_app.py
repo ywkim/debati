@@ -14,9 +14,7 @@ from utils.logging_utils import create_log_message
 from utils.message_utils import UserStance, prepare_chat_messages
 
 ASSISTANT_AVATAR_URL = "https://avatars.slack-edge.com/2023-11-19/6217189323093_136df1241dc3492d67d6_192.png"
-AVATARS = {
-"assistant": ASSISTANT_AVATAR_URL
-}
+AVATARS = {"assistant": ASSISTANT_AVATAR_URL}
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -84,7 +82,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 logging.info("Override configuration with Firebase settings")
 
             # Evaluate debate performance after each message
-            st.session_state.debate_score = evaluate_debate_performance(app_config, st.session_state.thread_messages)
+            st.session_state.debate_score = evaluate_debate_performance(
+                app_config, st.session_state.thread_messages
+            )
 
             # Format messages for chat model processing with appropriate system prompt
             formatted_messages = format_messages(st.session_state.thread_messages)
@@ -100,7 +100,9 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 response_message = ""
 
             # Generate response using chat model
-            for message_chunk in ask_question(formatted_messages, app_config, user_stance):
+            for message_chunk in ask_question(
+                formatted_messages, app_config, user_stance
+            ):
                 logging.info(
                     create_log_message(
                         "Received response from OpenAI API",
@@ -121,7 +123,10 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.error(error_message)
 
     # Check if the user has already chosen a stance
-    if "user_stance" not in st.session_state and len(st.session_state.thread_messages) > 1:
+    if (
+        "user_stance" not in st.session_state
+        and len(st.session_state.thread_messages) > 1
+    ):
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
             # Display stance selection interface
             user_stance = display_stance_selection(debate_topic)
@@ -136,14 +141,16 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
             # If user stance is selected, reset thread_messages for debating phase
             # Reset thread messages for debating phase
-            st.session_state.thread_messages = [{"role": "assistant", "content": initial_message}]
+            st.session_state.thread_messages = [
+                {"role": "assistant", "content": initial_message}
+            ]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
-
 
     if "user_stance" in st.session_state and len(st.session_state.thread_messages) > 2:
         # Update progress bar and feedback
         st.progress(st.session_state.debate_score / 10)
+
 
 def display_messages(messages: list[dict[str, Any]]) -> None:
     """
@@ -160,6 +167,7 @@ def display_messages(messages: list[dict[str, Any]]) -> None:
         with st.chat_message(role, avatar=AVATARS.get(role)):
             st.markdown(message["content"])
 
+
 def display_stance_selection(debate_topic: str) -> UserStance:
     """
     Displays the interface for the user to select their stance on the topic.
@@ -171,6 +179,7 @@ def display_stance_selection(debate_topic: str) -> UserStance:
     if cols[1].button("반대", use_container_width=True):
         return UserStance.CON
     return UserStance.UNDECIDED
+
 
 def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
     """Formats messages for the chatbot's processing."""
@@ -186,7 +195,9 @@ def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
 
 
 def ask_question(
-        formatted_messages: list[BaseMessage], app_config: AppConfig, user_stance: UserStance
+    formatted_messages: list[BaseMessage],
+    app_config: AppConfig,
+    user_stance: UserStance,
 ) -> Generator[str, None, None]:
     """
     Initialize a chat model and stream the chat conversation. This includes optional prefix messages loaded
@@ -202,11 +213,16 @@ def ask_question(
         Generator[str, None, None]: Generator yielding each content chunk from the Chat API responses.
     """
     chat = init_chat_model(app_config)
-    prepared_messages = prepare_chat_messages(formatted_messages, app_config, user_stance)
+    prepared_messages = prepare_chat_messages(
+        formatted_messages, app_config, user_stance
+    )
     for chunk in chat.stream(prepared_messages):
         yield str(chunk.content)
 
-def evaluate_debate_performance(app_config: StreamlitAppConfig, thread_messages: list[dict[str, Any]]) -> float:
+
+def evaluate_debate_performance(
+    app_config: StreamlitAppConfig, thread_messages: list[dict[str, Any]]
+) -> float:
     """
     Evaluates the student's performance in the debate using AI and returns the score and feedback.
 
@@ -217,11 +233,16 @@ def evaluate_debate_performance(app_config: StreamlitAppConfig, thread_messages:
     Returns:
         tuple[float, str]: A tuple containing the debate score and feedback.
     """
-    messages_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in thread_messages])
+    messages_str = "\n".join(
+        [f"{msg['role']}: {msg['content']}" for msg in thread_messages]
+    )
     evaluation_prompt = app_config.debate_evaluation_prompt
 
     chat = init_chat_model(app_config)
-    formatted_messages = [SystemMessage(content=evaluation_prompt), HumanMessage(content=messages_str)]
+    formatted_messages = [
+        SystemMessage(content=evaluation_prompt),
+        HumanMessage(content=messages_str),
+    ]
     resp = chat.generate([formatted_messages])
     response = resp.generations[0][0].text
 
@@ -231,7 +252,11 @@ def evaluate_debate_performance(app_config: StreamlitAppConfig, thread_messages:
 
     debate_score = min(debate_score, 10.0)
 
-    logging.info(create_log_message("Evaluation Response", response=response, debate_score=debate_score))
+    logging.info(
+        create_log_message(
+            "Evaluation Response", response=response, debate_score=debate_score
+        )
+    )
 
     return debate_score
 

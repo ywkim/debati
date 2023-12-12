@@ -77,10 +77,7 @@ class AppConfig(ABC):
     @property
     def debate_topic(self) -> str:
         """Returns the current debate topic."""
-        return self.config.get(
-            "settings",
-            "debate_topic"
-        )
+        return self.config.get("settings", "debate_topic")
 
     @property
     def questioning_system_prompt(self) -> str:
