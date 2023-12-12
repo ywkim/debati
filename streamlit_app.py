@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 import logging
+import re
 from collections.abc import Generator
 from typing import Any
 
@@ -11,7 +11,7 @@ from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from config.app_config import AppConfig, init_chat_model
 from config.streamlit_config import StreamlitAppConfig
 from utils.logging_utils import create_log_message
-from utils.message_utils import prepare_chat_messages, UserStance
+from utils.message_utils import UserStance, prepare_chat_messages
 
 ASSISTANT_AVATAR_URL = "https://avatars.slack-edge.com/2023-11-19/6217189323093_136df1241dc3492d67d6_192.png"
 AVATARS = {
@@ -143,7 +143,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
     if "user_stance" in st.session_state and len(st.session_state.thread_messages) > 2:
         # Update progress bar and feedback
-        progress_bar = st.progress(st.session_state.debate_score / 10)
+        st.progress(st.session_state.debate_score / 10)
 
 def display_messages(messages: list[dict[str, Any]]) -> None:
     """
@@ -229,8 +229,7 @@ def evaluate_debate_performance(app_config: StreamlitAppConfig, thread_messages:
     score_match = re.search(r"\b\d+(\.\d+)?\b", response)
     debate_score = float(score_match.group()) if score_match else 0.0
 
-    if debate_score > 10:
-        debate_score = 10.0
+    debate_score = min(debate_score, 10.0)
 
     logging.info(create_log_message("Evaluation Response", response=response, debate_score=debate_score))
 
