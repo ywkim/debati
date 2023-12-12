@@ -42,9 +42,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
     # Initialize session state for conversation history
     if "thread_messages" not in st.session_state:
-        st.session_state.thread_messages = [
-            {"role": "assistant", "content": f"{debate_topic}에 대해 궁금한 점을 자유롭게 물어보세요."}
-        ]
+        initialize_thread_messages(app_config, user_stance)
 
     if "companion_id" in st.session_state:
         companion_name = st.session_state.companion_id
@@ -134,16 +132,8 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
         if user_stance != UserStance.UNDECIDED:
             st.session_state.user_stance = user_stance
 
-            if user_stance == UserStance.PRO:
-                initial_message = f"당신이 {debate_topic}에 찬성함에 따라, 저는 반대 입장에서 토론을 진행합니다."
-            else:
-                initial_message = f"당신이 {debate_topic}에 반대함에 따라, 저는 찬성 입장에서 토론을 진행합니다."
+            initialize_thread_messages(app_config, user_stance)
 
-            # If user stance is selected, reset thread_messages for debating phase
-            # Reset thread messages for debating phase
-            st.session_state.thread_messages = [
-                {"role": "assistant", "content": initial_message}
-            ]
             # Display reset messages
             display_messages(st.session_state.thread_messages)
 
@@ -179,6 +169,30 @@ def display_stance_selection(debate_topic: str) -> UserStance:
     if cols[1].button("반대", use_container_width=True):
         return UserStance.CON
     return UserStance.UNDECIDED
+
+
+def initialize_thread_messages(
+    app_config: StreamlitAppConfig, user_stance: UserStance
+) -> None:
+    """
+    Initializes the thread messages in the session state with an appropriate initial message.
+
+    Args:
+        app_config (StreamlitAppConfig): The application configuration object.
+        user_stance (UserStance): The current stance of the user.
+    """
+    debate_topic = app_config.debate_topic
+
+    if user_stance == UserStance.UNDECIDED:
+        initial_message = f"{debate_topic}에 대해 궁금한 점을 자유롭게 물어보세요."
+    elif user_stance == UserStance.PRO:
+        initial_message = f"당신이 찬성 입장을 선택했으므로, 저는 {debate_topic}에 대해 반대 입장에서 토론을 진행합니다."
+    else:  # UserStance.CON
+        initial_message = f"당신이 반대 입장을 선택했으므로, 저는 {debate_topic}에 대해 찬성 입장에서 토론을 진행합니다."
+
+    st.session_state.thread_messages = [
+        {"role": "assistant", "content": initial_message}
+    ]
 
 
 def format_messages(thread_messages: list[dict[str, Any]]) -> list[BaseMessage]:
@@ -285,14 +299,14 @@ def main():
         if not companion_id:
             st.markdown("👈 상단 왼쪽 모서리에 있는 사이드바를 열어 Companion ID를 입력해 주세요.")
             return
+        app_config.load_config_from_firebase(companion_id)
+        logging.info("Override configuration with Firebase settings")
         if (
             "companion_id" not in st.session_state
             or st.session_state.companion_id != companion_id
         ):
             st.session_state.companion_id = companion_id
-            st.session_state.thread_messages = []
-        app_config.load_config_from_firebase(companion_id)
-        logging.info("Override configuration with Firebase settings")
+            initialize_thread_messages(app_config, UserStance.UNDECIDED)
 
     # Display chat interface
     handle_chat_interaction(app_config)
