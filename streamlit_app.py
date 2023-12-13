@@ -43,7 +43,7 @@ def initialize_chat_session_state(
         st.session_state.debate_score = 0
 
 
-def accept_user_input(companion_name: str) -> str:
+def accept_user_input(companion_name: str) -> str | None:
     """
     Accepts user input from the chat interface.
 
