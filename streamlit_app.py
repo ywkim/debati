@@ -21,7 +21,9 @@ logging.basicConfig(
 )
 
 
-def initialize_chat_session_state(app_config: StreamlitAppConfig, user_stance: UserStance) -> None:
+def initialize_chat_session_state(
+    app_config: StreamlitAppConfig, user_stance: UserStance
+) -> None:
     """
     Initializes the session state for the chat interaction.
 
@@ -40,7 +42,10 @@ def initialize_chat_session_state(app_config: StreamlitAppConfig, user_stance: U
     if "debate_score" not in st.session_state:
         st.session_state.debate_score = 0
 
-def display_chat_interface(companion_name: str, thread_messages: list[dict[str, Any]]) -> None:
+
+def display_chat_interface(
+    companion_name: str, thread_messages: list[dict[str, Any]]
+) -> None:
     """
     Displays the chat interface elements in the Streamlit app.
 
@@ -52,6 +57,7 @@ def display_chat_interface(companion_name: str, thread_messages: list[dict[str, 
     """
     # Display existing chat messages
     display_messages(thread_messages)
+
 
 def accept_user_input(companion_name: str) -> str:
     """
@@ -73,6 +79,7 @@ def accept_user_input(companion_name: str) -> str:
         )
     )
     return user_input
+
 
 def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     """
@@ -193,7 +200,10 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
                 chat_placeholder.empty()
 
-        if "user_stance" in st.session_state and len(st.session_state.thread_messages) > 2:
+        if (
+            "user_stance" in st.session_state
+            and len(st.session_state.thread_messages) > 2
+        ):
             # Update progress bar and feedback
             st.progress(st.session_state.debate_score / 10)
 
