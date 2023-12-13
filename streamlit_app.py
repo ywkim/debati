@@ -50,8 +50,6 @@ def display_chat_interface(companion_name: str, thread_messages: list[dict[str, 
         companion_name (str): The name of the companion or debate topic.
         thread_messages (list[dict[str, Any]]): The list of messages to be displayed.
     """
-    st.title(companion_name)
-
     # Display existing chat messages
     display_messages(thread_messages)
 
@@ -96,6 +94,15 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     # Initialize session state
     initialize_chat_session_state(app_config, user_stance)
 
+    # Display chat interface
+    debate_topic = app_config.debate_topic
+    if "companion_id" in st.session_state:
+        companion_name = st.session_state.companion_id
+    else:
+        companion_name = f"토론 주제: {debate_topic}"
+
+    st.title(companion_name)
+
     # Placeholder for chat messages
     chat_placeholder = st.empty()
     chat_container = chat_placeholder.container()
@@ -103,14 +110,6 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     # Placeholder for user interactions
     interaction_placeholder = st.empty()
     interaction_placeholder.empty()
-    interaction_container = interaction_placeholder.container()
-
-    # Display chat interface
-    debate_topic = app_config.debate_topic
-    if "companion_id" in st.session_state:
-        companion_name = st.session_state.companion_id
-    else:
-        companion_name = f"토론 주제: {debate_topic}"
 
     # Accept user input
     user_input = accept_user_input(companion_name)
@@ -123,17 +122,15 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
             st.session_state.thread_messages.append(user_message)
             display_messages([user_message])
 
+            with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
+                message_placeholder = st.empty()
+
             try:
                 # If Firebase is enabled, override the config with the one from Firebase
                 if app_config.firebase_enabled:
                     companion_id = st.session_state.companion_id
                     app_config.load_config_from_firebase(companion_id)
                     logging.info("Override configuration with Firebase settings")
-
-                # Evaluate debate performance after each message
-                st.session_state.debate_score = evaluate_debate_performance(
-                    app_config, st.session_state.thread_messages
-                )
 
                 # Format messages for chat model processing with appropriate system prompt
                 formatted_messages = format_messages(st.session_state.thread_messages)
@@ -144,9 +141,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                     )
                 )
 
-                with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
-                    message_placeholder = st.empty()
-                    response_message = ""
+                response_message = ""
 
                 # Generate response using chat model
                 for message_chunk in ask_question(
@@ -164,12 +159,19 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
                 assistant_message = {"role": "assistant", "content": response_message}
                 st.session_state.thread_messages.append(assistant_message)
+
+                # Evaluate debate performance after each message
+                st.session_state.debate_score = evaluate_debate_performance(
+                    app_config, st.session_state.thread_messages
+                )
             except Exception:  # pylint: disable=broad-except
                 logging.error("Error in chat interface: ", exc_info=True)
                 error_message = (
                     "Sorry, I encountered a problem while processing your request."
                 )
                 st.error(error_message)
+
+    interaction_container = interaction_placeholder.container()
 
     with interaction_container:
         # Check if the user has already chosen a stance
