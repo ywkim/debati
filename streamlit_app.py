@@ -43,22 +43,6 @@ def initialize_chat_session_state(
         st.session_state.debate_score = 0
 
 
-def display_chat_interface(
-    companion_name: str, thread_messages: list[dict[str, Any]]
-) -> None:
-    """
-    Displays the chat interface elements in the Streamlit app.
-
-    This function renders the chat title and existing chat messages in the Streamlit interface.
-
-    Args:
-        companion_name (str): The name of the companion or debate topic.
-        thread_messages (list[dict[str, Any]]): The list of messages to be displayed.
-    """
-    # Display existing chat messages
-    display_messages(thread_messages)
-
-
 def accept_user_input(companion_name: str) -> str:
     """
     Accepts user input from the chat interface.
@@ -122,7 +106,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     user_input = accept_user_input(companion_name)
 
     with chat_container:
-        display_chat_interface(companion_name, st.session_state.thread_messages)
+        display_messages(st.session_state.thread_messages)
 
         if user_input:
             user_message = {"role": "user", "content": user_input}
