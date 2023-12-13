@@ -21,6 +21,61 @@ logging.basicConfig(
 )
 
 
+def initialize_chat_session_state(app_config: StreamlitAppConfig, user_stance: UserStance) -> None:
+    """
+    Initializes the session state for the chat interaction.
+
+    This function sets up the necessary session state variables for tracking the conversation history,
+    user stance, and debate score.
+
+    Args:
+        app_config (StreamlitAppConfig): The configuration object for the app.
+        user_stance (UserStance): The initial stance of the user in the debate.
+    """
+    # Initialize session state for conversation history
+    if "thread_messages" not in st.session_state:
+        initialize_thread_messages(app_config, user_stance)
+
+    # Initialize or update the progress bar
+    if "debate_score" not in st.session_state:
+        st.session_state.debate_score = 0
+
+def display_chat_interface(companion_name: str, thread_messages: list[dict[str, Any]]) -> None:
+    """
+    Displays the chat interface elements in the Streamlit app.
+
+    This function renders the chat title and existing chat messages in the Streamlit interface.
+
+    Args:
+        companion_name (str): The name of the companion or debate topic.
+        thread_messages (list[dict[str, Any]]): The list of messages to be displayed.
+    """
+    st.title(companion_name)
+
+    # Display existing chat messages
+    display_messages(thread_messages)
+
+def accept_user_input(companion_name: str) -> str:
+    """
+    Accepts user input from the chat interface.
+
+    This function creates a chat input field and returns the user's input.
+
+    Args:
+        companion_name (str): The name of the companion or debate topic.
+
+    Returns:
+        str: The user's input message.
+    """
+    user_input = st.chat_input(f"Message {companion_name}...")
+    logging.info(
+        create_log_message(
+            "Received a question from user",
+            user_input=user_input,
+        )
+    )
+    return user_input
+
 def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     """
     Manages the chat interaction, including displaying the chat interface and handling user inputs and responses.
@@ -40,33 +95,19 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     else:
         user_stance = UserStance.UNDECIDED
 
-    # Initialize session state for conversation history
-    if "thread_messages" not in st.session_state:
-        initialize_thread_messages(app_config, user_stance)
+    # Initialize session state
+    initialize_chat_session_state(app_config, user_stance)
 
+    # Display chat interface
     if "companion_id" in st.session_state:
         companion_name = st.session_state.companion_id
     else:
         companion_name = f"토론 주제: {debate_topic}"
 
-    # Initialize or update the progress bar
-    if "debate_score" not in st.session_state:
-        st.session_state.debate_score = 0
+    display_chat_interface(companion_name, st.session_state.thread_messages)
 
-    st.title(companion_name)
-
-    # Display existing chat messages
-    display_messages(st.session_state.thread_messages)
-
-    # Accept user input and generate responses
-    user_input = st.chat_input(f"Message {companion_name}...")
-    logging.info(
-        create_log_message(
-            "Received a question from user",
-            user_input=user_input,
-        )
-    )
-
+    # Accept user input
+    user_input = accept_user_input(companion_name)
     if user_input:
         user_message = {"role": "user", "content": user_input}
         st.session_state.thread_messages.append(user_message)
