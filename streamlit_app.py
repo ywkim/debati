@@ -168,6 +168,7 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
     # Placeholder for user interactions
     interaction_placeholder = st.empty()
+    interaction_placeholder.empty()
     interaction_container = interaction_placeholder.container()
 
     with interaction_container:
