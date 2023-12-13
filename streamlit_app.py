@@ -100,6 +100,11 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
     chat_placeholder = st.empty()
     chat_container = chat_placeholder.container()
 
+    # Placeholder for user interactions
+    interaction_placeholder = st.empty()
+    interaction_placeholder.empty()
+    interaction_container = interaction_placeholder.container()
+
     # Display chat interface
     debate_topic = app_config.debate_topic
     if "companion_id" in st.session_state:
@@ -166,11 +171,6 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
                 )
                 st.error(error_message)
 
-    # Placeholder for user interactions
-    interaction_placeholder = st.empty()
-    interaction_placeholder.empty()
-    interaction_container = interaction_placeholder.container()
-
     with interaction_container:
         # Check if the user has already chosen a stance
         if (
@@ -188,6 +188,8 @@ def handle_chat_interaction(app_config: StreamlitAppConfig) -> None:
 
                 # Display reset messages
                 display_messages(st.session_state.thread_messages)
+
+                chat_placeholder.empty()
 
         if "user_stance" in st.session_state and len(st.session_state.thread_messages) > 2:
             # Update progress bar and feedback
