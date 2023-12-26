@@ -1,0 +1,58 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+env:
+  PROJECT_ID: debati
+  SERVICE_NAME: debati
+  REGION: asia-northeast3
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    # Authentication via credentials json
+    - id: "auth"
+      name: "Authenticate to Google Cloud"
+      uses: "google-github-actions/auth@v1"
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    # Setup gcloud CLI
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Configure Docker to use gcloud command-line tool as a credential helper
+      run: gcloud auth configure-docker
+
+    # Build the Docker image
+    - name: Build
+      run: |-
+        docker build -t "gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA" .
+
+    # Push the Docker image to Google Container Registry
+    - name: Publish
+      run: |-
+        docker push "gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA"
+
+    - name: Deploy to Cloud Run
+      id: deploy
+      uses: google-github-actions/deploy-cloudrun@v1
+      with:
+        service: $SERVICE_NAME
+        image: "gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA"
+        region: $REGION
+        allow_unauthenticated: true
+
+    - name: Log deployment URL
+      run: echo "Deployed to ${{ steps.deploy.outputs.url }}"

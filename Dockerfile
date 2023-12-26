@@ -1,13 +1,13 @@
 # Use an official Python 3.8 image
 FROM python:3.8
 
-# Set the working directory in the docker container
+# Set the working directory in the Docker container
 WORKDIR /app
 
-# We copy just the pyproject.toml and poetry.lock files first to leverage Docker cache
+# Copy the pyproject.toml and poetry.lock files first to leverage Docker cache
 COPY pyproject.toml poetry.lock ./
 
-# Install necessary dependencies using poetry
+# Install dependencies using poetry
 RUN pip install poetry
 RUN poetry config virtualenvs.create false \
 && poetry install --no-interaction --no-ansi --no-dev
@@ -16,10 +16,13 @@ RUN poetry config virtualenvs.create false \
 # This includes our main Streamlit application script and any other necessary files
 COPY . /app
 
-# Expose the port Streamlit runs on, which is 8501 by default
-# This makes the port available to other services and users
-EXPOSE 8501
+# Set the environment variable for the port
+# Cloud Run will set this environment variable automatically,
+# but the default is also set here for local testing purposes
+ENV PORT=8501
 
-# Define the command to run our Streamlit app
-# This CMD instruction is executed when the Docker container starts up
-CMD ["streamlit", "run", "streamlit_app.py"]
+# Expose the port the app runs on
+EXPOSE $PORT
+
+# Define the command to run the Streamlit app
+CMD ["sh", "-c", "streamlit run --server.port $PORT streamlit_app.py"]
