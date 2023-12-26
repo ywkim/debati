@@ -16,10 +16,13 @@ RUN poetry config virtualenvs.create false \
 # This includes our main Streamlit application script and any other necessary files
 COPY . /app
 
-# Expose the port Streamlit runs on, which is 8501 by default
-# This makes the port available to other services and users
-EXPOSE 8501
+# Set the environment variable for the port
+# Cloud Run will set this environment variable automatically,
+# but the default is also set here for local testing purposes
+ENV PORT=8501
 
-# Define the command to run our Streamlit app
-# This CMD instruction is executed when the Docker container starts up
-CMD ["streamlit", "run", "streamlit_app.py"]
+# Expose the port the app runs on
+EXPOSE $PORT
+
+# Define the command to run the Streamlit app
+CMD ["sh", "-c", "streamlit run --server.port $PORT streamlit_app.py"]
