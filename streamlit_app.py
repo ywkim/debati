@@ -212,7 +212,9 @@ def display_stance_selection(debate_topic: str) -> UserStance:
     """
     Displays the interface for the user to select their stance on the topic.
     """
-    st.write(f"{debate_topic}에 대해 궁금한 점이 더 있다면, 계속해서 물어보세요. 질문이 없다면 {debate_topic}에 대한 여러분의 입장을 ‘찬성'과 ‘반대' 중 하나를 골라주세요.")
+    st.write(
+        f"{debate_topic}에 대해 궁금한 점이 더 있다면, 계속해서 물어보세요. 질문이 없다면 {debate_topic}에 대한 여러분의 입장을 ‘찬성'과 ‘반대' 중 하나를 골라주세요."
+    )
     cols = st.columns(2)
     if cols[0].button("찬성", use_container_width=True):
         return UserStance.PRO
@@ -375,7 +377,7 @@ def main():
             }
 
     st.markdown(
-    """
+        """
     <style>
     .viewerBadge_link__qRIco {
         visibility: hidden;
@@ -387,7 +389,7 @@ def main():
     }
    </style>
     """,
-    unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # Display chat interface
