@@ -212,7 +212,9 @@ def display_stance_selection(debate_topic: str) -> UserStance:
     """
     Displays the interface for the user to select their stance on the topic.
     """
-    st.write(f"{debate_topic}에 대한 당신의 입장은 무엇인가요?")
+    st.write(
+        f"{debate_topic}에 대해 궁금한 점이 더 있다면, 계속해서 물어보세요. 질문이 없다면 {debate_topic}에 대한 여러분의 입장을 ‘찬성'과 ‘반대' 중 하나를 골라주세요."
+    )
     cols = st.columns(2)
     if cols[0].button("찬성", use_container_width=True):
         return UserStance.PRO
@@ -236,9 +238,9 @@ def initialize_thread_messages(
     if user_stance == UserStance.UNDECIDED:
         initial_message = f"{debate_topic}에 대해 궁금한 점을 자유롭게 물어보세요."
     elif user_stance == UserStance.PRO:
-        initial_message = f"당신이 찬성 입장을 선택했으므로, 저는 {debate_topic}에 대해 반대 입장에서 토론을 진행합니다."
+        initial_message = f"당신이 찬성 입장을 선택했으므로, 저는 {debate_topic}에 대해 반대 입장에서 토론을 진행합니다. 이제 우리 토론을 시작해 볼까요?"
     else:  # UserStance.CON
-        initial_message = f"당신이 반대 입장을 선택했으므로, 저는 {debate_topic}에 대해 찬성 입장에서 토론을 진행합니다."
+        initial_message = f"당신이 반대 입장을 선택했으므로, 저는 {debate_topic}에 대해 찬성 입장에서 토론을 진행합니다. 이제 우리 토론을 시작해 볼까요?"
 
     st.session_state.thread_messages = [
         {"role": "assistant", "content": initial_message}
@@ -357,6 +359,38 @@ def main():
         ):
             st.session_state.companion_id = companion_id
             initialize_thread_messages(app_config, UserStance.UNDECIDED)
+
+    with st.sidebar:
+        st.title("학생 정보")
+        student_grade = st.text_input("학년", placeholder="예: 3")
+        student_class = st.text_input("반", placeholder="예: 2")
+        student_number = st.text_input("번호", placeholder="예: 15")
+        student_name = st.text_input("이름", placeholder="예: 홍길동")
+
+        # 세션 상태에 정보 저장
+        if student_grade and student_class and student_number and student_name:
+            st.session_state.student_info = {
+                "grade": student_grade,
+                "class": student_class,
+                "number": student_number,
+                "name": student_name,
+            }
+
+    st.markdown(
+        """
+    <style>
+    .viewerBadge_link__qRIco {
+        visibility: hidden;
+        pointer-events: none;
+        display: block;
+        height: 1em;
+        mix-blend-mode: screen;
+        width: auto;
+    }
+   </style>
+    """,
+        unsafe_allow_html=True,
+    )
 
     # Display chat interface
     handle_chat_interaction(app_config)
